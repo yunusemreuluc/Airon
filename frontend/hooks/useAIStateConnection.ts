@@ -16,7 +16,18 @@ import { playSfx } from '@/services/sfxPlayer';
 const WS_URL = 'ws://localhost:8000/ws';
 const RECONNECT_DELAY_MS = 3000;
 
-const VALID_STATES = new Set<AIState>(['idle', 'listening', 'thinking', 'speaking', 'vision']);
+// Bu küme core/web_ui.py STATE_MAP'in değerleriyle AYNI olmak zorunda: burada
+// eksik kalan bir durum sessizce yutulur ve sahne eski hâlinde donar (2026-07-31
+// `automation`/`memory` eklenirken bu satır da güncellendi).
+const VALID_STATES = new Set<AIState>([
+  'idle',
+  'listening',
+  'thinking',
+  'speaking',
+  'vision',
+  'automation',
+  'memory',
+]);
 
 // Backend'in tespit sözlüğü (snake_case, bkz. actions/object_recognition.py) →
 // arayüzün tipi. Kutu koordinatı gelmezse (eski bir sürüm ya da tespit
@@ -66,6 +77,8 @@ const DEMO_CYCLE: { state: AIState; durationMs: number }[] = [
   { state: 'thinking', durationMs: 3500 },
   { state: 'speaking', durationMs: 4000 },
   { state: 'vision', durationMs: 3500 },
+  { state: 'automation', durationMs: 3000 },
+  { state: 'memory', durationMs: 3000 },
 ];
 
 // AI Bağlantıları. backend/'in WebSocket'ine

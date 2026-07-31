@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-// CLAUDE.md § STATE MANAGEMENT — ayrı store'lar, tek yerde toplamıyoruz.
+// Notes/Tasarim-Kurallari.md § Durum yönetimi — ayrı store'lar, tek yerde toplamıyoruz.
 // Sidebar (ikon rayı) ve LeftPanel hangi modülün seçili olduğunu burada paylaşıyor.
 //
 // 'voice' kullanıcı isteğiyle (2026-07-29) bu listeden ÇIKARILDI: sohbet artık

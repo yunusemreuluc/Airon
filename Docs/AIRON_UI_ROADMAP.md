@@ -35,6 +35,9 @@ gösterilecek bir veri **yok**, o yüzden dürüst boş durum gösteriyorlar:
 - [ ] Telemetri kartında GPU ve sıcaklık yok — Windows'ta `psutil` ikisini de güvenilir
       vermiyor (`sensors_temperatures` çoğu masaüstünde boş döner, GPU için ayrı bir
       satıcı kütüphanesi gerekir). Uydurmak yerine hiç gösterilmiyor.
+      (İnternet ve saat 2026-07-31'de eklendi — `Notes/Arayuz.md` § Telemetri şeridi.)
+- [ ] Sol ray etiketi ile AIRON imzası 19×9 px çakışıyor — yerleşim kararı gerekiyor
+      (`Docs/YAPILACAKLAR.md` #19).
 
 ---
 

@@ -40,7 +40,7 @@ olaylar `backend/models/events.py` içindeki `EventType` listesinde tanımlı.
 
 Kullanıcı isteğiyle (2026-07-31) yeniden tasarlandı. Önceki sürüm siyah ekranda
 AIRON yazısı ve **dolan bir ilerleme çubuğuydu** — bu bir yükleme ekranı dili ve
-`CLAUDE.md § PROJE`'nin "gösterge paneli DEĞİLDİR" maddesiyle çelişiyordu.
+`CLAUDE.md § PROJECT`'in "gösterge paneli DEĞİLDİR" maddesiyle çelişiyordu.
 Sonrasındaki 3D kuruluş zaten iyiydi; sorun ondan öncesiydi.
 
 Yeni akış tek bir fikir üzerine kurulu: **çekirdek ateşleniyor.**
@@ -201,6 +201,120 @@ Palet **tek kaynak**: çekirdek, korona ve elektrik arkları hepsi oradan
 besleniyor — ayrı yazılsalardı biri geride kalır ve yeşil çekirdeğin etrafında
 mavi bir korona dönerdi.
 
+### Beş tepki
+
+Başlıkta tarih YOK bilerek: koddaki altı yorum `§ Beş tepki` diye atıf yapıyor,
+başlığa ek koymak o atıfları kırar.
+
+2026-07-31. Tasarım kuralı çekirdeğin beş şeye tepki vermesini istiyordu;
+gerçekte **üçü** çalışıyordu. Her araç çağrısı `THINKING` yayınlıyordu, yani Aıron'un ekranı ele
+geçirmesiyle hava durumuna bakması sahnede birebir aynı görünüyordu. `VISION`
+ise `STATE_MAP`'te duruyor ama `main.py` hiç göndermiyordu — **ölü bir daldı**.
+
+| Durum | Etiket | Renk | Hareket |
+|---|---|---|---|
+| `listening` / `speaking` | Dinliyor / Konuşuyor | buz mavisi / turkuaz-yeşil | nabız hızlanır, çekirdek büyür |
+| `thinking` | Düşünüyor | buz mavisi, kısık | yavaş, sakin yüzey |
+| `vision` | Görüyor | buz mavisi, parlak | türbülanslı yüzey |
+| `automation` | **Uyguluyor** | kehribar (`SOLAR_AMBER`) | dönüş **2.4×**, yüzey pürüzsüz, hafif küçülme |
+| `memory` | **Hatırlıyor** | mor (`DEEP_VIOLET`) | dönüş **0.4×**, derin nefes, dalgalı yüzey |
+
+Kehribar seçildi çünkü kullanılmayan tek aile oydu — ama asıl gerekçe anlamsal:
+kehribar her arayüzde "dikkat, makine hareket ediyor" demek. Aıron fareyi ele
+aldığı an bunun **anında** fark edilmesi gerekiyor; bu dekorasyon değil uyarı.
+Kırmızıya kaçılmadı, kırmızı "hata" der.
+
+Renk tek başına yetmiyor: hız da bilgi taşıyor. Otomasyon sahnenin en hareketli
+hâli, hafıza en durgunu. Göz ucuyla bakıldığında ya da renk körlüğünde ayrımı
+taşıyan şey bu.
+
+**Hangi araç hangi durumu tetikliyor:** `core/web_ui.py` → `state_for_tool`.
+Ayrım okuma/yazma: `get_calendar_events` düşünme, `add_calendar_event`
+otomasyon. Liste **beyaz liste** — adı geçmeyen araç `thinking`e düşüyor, yani
+yeni bir araç eklenip yazılmazsa davranış bugünküne eşit olur, sessizce yanlış
+bir durum göstermez. Kapsamlı eşleme zorunlu tutulsaydı araç eklemenin maliyeti
+beşinci bir dosya olurdu.
+
+**Ölçüm** (kaydırılmış çekirdek pikselleri, en parlak %15): otomasyon 33° ton,
+hafıza 257°, geri kalan her şey 161-219° arasında. Hafızanın en yakın komşusuna
+uzaklığı 38°. İlk denemede kenar rengi `#ece4ff` idi ve doygunluk %15'e
+düşüyordu — fresnel kenarı parlak piksellere hâkim olduğu için mor durum
+sahnenin en soluk hâli oluyordu. Kenar mora boyanınca %22'ye çıktı.
+
+## Sol ray
+
+Sadece ikon, hover olmadıkça etiket yok. Aktiflik göstergesi rayın **sol
+kenarında** kayan ince bir hat (`layoutId` ile modüller arasında akıyor).
+
+**Hover büyümesi (2026-07-31):** düğme `1.08` ölçekleniyor — 40 px'de ~3 px,
+hissedilen ama ölçülmesi zor. `active:scale-95` de eklendi: büyüme varsa
+basmanın da karşılığı olmalı, yoksa düğme hover'da canlı, tıklamada ölü.
+
+Bunun için `RailButton`'ın yapısı değişti: **aktiflik hattı ve etiket balonu
+artık butonun DIŞINDA**, saran kutuda. İkisi de içeride kalsaydı ölçekle
+birlikte büyürlerdi — `layoutId` ile animasyonlu hat, ölçeklenmiş bir kutuda
+ölçüldüğü için modül değişiminde yanlış konuma akardı; etiketteki 11 px yazı
+da oynardı. Doğrulandı: hover'da buton 40 → 43.2 px, etiket `scale: none` ve
+11 px, hat 2×20 sabit.
+
+**Bilinen çakışma:** ilk düğmenin etiketi `BrandBadge` ile 19×9 px örtüşüyor
+(`Docs/YAPILACAKLAR.md` #19).
+
+## Telemetri şeridi
+
+Tepsi düğmesinin yanında tek satır: **CPU · RAM · Disk · Pil · İnternet · Saat**
+(286×38 px, yatay taşma yok).
+
+İnternet **gerçek**: backend 1.1.1.1:53'e TCP bağlanıp süreyi ölçüyor
+(`backend/api/system.py` → `_probe_internet`). `psutil.net_io_counters`
+kullanılmadı — o yalnızca arayüzden kaç bayt geçtiğini söyler, kablo takılı ama
+internet yokken de artar, yani "bağlı" demek için yanlış ölçüt.
+
+Detaylar:
+
+- Sonda **asenkron** (`asyncio.open_connection`). Bloklayan bir soket, 1.5 sn
+  boyunca olay döngüsünü ve onunla birlikte tüm WebSocket yayınlarını dondururdu.
+- **15 sn önbellek** — kart 3 sn'de bir sorguluyor, her sorguya bir TCP el
+  sıkışması bindirmek gereksiz.
+- Gecikme **en az 1 ms** gösteriliyor. Ölçüm bir kez 0'a yuvarladı; "0ms"
+  ekranda "kusursuz bağlantı" diye okunurdu, oysa hiçbir el sıkışması 0 sürmez.
+- **Uyarı:** bu sayı "1.1.1.1'e bağlanma süresi", internet kalitesinin tamamı
+  değil. Şeffaf vekil/güvenlik duvarı olan ağlarda SYN'i o cihaz yanıtlar ve
+  süre gerçekte olduğundan iyi görünür. Ulaşılabilirlik için doğru, hız testi
+  için değil.
+- Çevrimdışıyken alan **gizlenmiyor**, üstü çizili ikon + "yok" gösteriliyor.
+  GPU/sıcaklıktan farkı bu: onları ölçemiyoruz, bunu ölçebiliyoruz ve cevap
+  "hayır" — bu bir eksiklik değil, bilgi.
+
+Saat dakika başına **hizalı** uyanıyor (`setInterval(1000)` değil): gösterilen
+değer dakikada bir değişiyor, saniyede bir render etmek 59 boş render demekti.
+Sahne 60 FPS hedefliyor, aynı ana iş parçacığında boş render biriktirilmez.
+
+## Kare hızı — ölçüldü
+
+`three/FrameProbe.tsx` kalıcı bir sonda: kare başına tek `Float32Array` yazması,
+ayırma yok. `window.__aironFps()` ile okunuyor, `window.__aironFpsReset()` ile
+sıfırlanıyor.
+
+**Ölçüm (2026-07-31, gerçek WebView2 penceresi, 1540×844 @ 1.25 DPR, 144 Hz):**
+
+| | En yoğun¹ | Sade (yalnızca sahne) |
+|---|---|---|
+| Gerçek ortalama FPS | **68.8** / **77.6** | 74.5 / 76.7 |
+| Kare süresi p50 | 14.3 / 12.8 ms | 13.0 / 12.9 ms |
+| p95 | 18.8 / 15.9 ms | 16.3 / 16.5 ms |
+| En kötü kare | 32.2 / 24.3 ms | 23.3 / 26.1 ms |
+| 16.7 ms bütçesini aşan | %15.6 / %2.9 | %3.4 / %4.4 |
+
+¹ vision durumu + 8 FPS webcam karesi + 8 tespit çerçevesi + tüm paneller açık.
+İki bağımsız tur, ikisi de kendi içinde tutarlı (ortalama ≈ ortancadan türetilen).
+
+**Sonuç: 60 FPS hedefi tutuyor** — en yoğun hâlde bile ~69-78 FPS, ortanca kare
+14 ms civarı, bütçe 16.7 ms. Ama pay sanıldığı kadar geniş değil: ekran 144 Hz
+(6.94 ms) ve sahne onu yakalayamıyor, kareler iki vsync aralığına oturuyor.
+Yani gerçek iş süresi 7-14 ms arasında bir yerde; vsync kuantalaması yüzünden
+daha kesin söylenemez.
+
 ## Küçük parçalar
 
 - **Ses dalga formu** — veri tarayıcıdan değil backend'den (`mic_level`, ~12 FPS).
@@ -215,7 +329,9 @@ mavi bir korona dönerdi.
 
 ## Doğrulama notu
 
-Arayüz Playwright ile test ediliyor: statik export sunulup WebSocket sahte bir
-sınıfla değiştiriliyor, olaylar `window.__emit` ile enjekte ediliyor. Gerçek
-soket bağlanırsa demo durum döngüsü duruyor ve durum `idle`'da kalıyor — bu
-yüzden renk/durum testlerinde soket bilerek engelleniyor.
+Arayüz Playwright ile test ediliyor. Tercih edilen düzenek: statik export'u
+8000 portundan sunan **sahte bir backend** ve gerçek bir WebSocket — böylece
+Pydantic zarfı ve arayüzün ayrıştırıcısı da yolun içinde kalıyor. Soketi sahte
+bir sınıfla değiştirip olay enjekte etmek backend'i atlıyor.
+
+Ayrıntı ve tuzakları için [[Bilinen-Tuzaklar]] § Arayüzü nasıl test ediyoruz.

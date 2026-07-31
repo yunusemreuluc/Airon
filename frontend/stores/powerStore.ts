@@ -33,7 +33,6 @@ export const SLEEP_DIM = 0.14;
 
 export const usePowerStore = create<PowerStore>((set) => ({
   powerState: 'awake',
-  toggle: () =>
-    set((state) => ({ powerState: state.powerState === 'awake' ? 'asleep' : 'awake' })),
+  toggle: () => set((state) => ({ powerState: state.powerState === 'awake' ? 'asleep' : 'awake' })),
   wake: () => set({ powerState: 'awake' }),
 }));

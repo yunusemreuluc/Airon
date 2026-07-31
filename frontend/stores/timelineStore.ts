@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-// AIRON alt zaman çizelgesi — CLAUDE.md § BOTTOM PANEL
+// AIRON alt zaman çizelgesi — Notes/Tasarim-Kurallari.md § Panel yerleşimi
 // (Timeline / Reasoning / Tasks / Progress / Logs). Kullanıcı isteğiyle
 // (2026-07-30) sıfırdan yazıldı.
 //

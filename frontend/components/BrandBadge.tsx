@@ -18,6 +18,12 @@ const STATE_DOT: Record<AIState, { color: string; pulseSeconds: number }> = {
   thinking: { color: 'var(--color-cyan)', pulseSeconds: 2.4 },
   speaking: { color: 'var(--color-primary-strong)', pulseSeconds: 0.9 },
   vision: { color: 'var(--color-primary)', pulseSeconds: 1.8 },
+  // Bu iki durum tek vurgu renginin DIŞINA çıkan tek istisna (2026-07-31, bkz.
+  // Notes/Arayuz.md § Beş tepki): çekirdek zaten kehribar/mora dönüyor, nokta
+  // mavide kalsaydı rozet sahneyle çelişirdi. Değerler three/palette.ts'teki
+  // SOLAR_AMBER.rim / DEEP_VIOLET.rim ile aynı — nokta, kürenin kenar rengi.
+  automation: { color: '#fff0d6', pulseSeconds: 0.7 },
+  memory: { color: '#dcc9ff', pulseSeconds: 2.8 },
 };
 
 export function BrandBadge() {

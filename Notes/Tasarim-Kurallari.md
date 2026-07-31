@@ -42,7 +42,8 @@ AIRON'un merkezi canlıdır. Sürekli nefes alır, yavaşça döner, parçacık 
 ışımasını değiştirir, kullanıcı etkinliğine tepki verir. **Asla durağan olmaz.**
 
 Tepki vermesi gereken beş şey: Ses, Düşünme, Görü, **Otomasyon**, **Hafıza**.
-Son ikisi henüz yok — bkz. `Docs/YAPILACAKLAR.md` #15.
+Beşi de çalışıyor (2026-07-31) — hangi rengin/hareketin neyi anlattığı ve
+hangi aracın hangi durumu tetiklediği [[Arayuz]] § Durum renkleri içinde.
 
 ## Renk
 
@@ -62,7 +63,7 @@ sol raydan dock'a taşındığı hep orada.
 Özet kurallar:
 
 - **Sol ray:** sadece ikonlar, minimal, saydam, hover'da hafifçe büyür
-  (büyüme henüz yok — `Docs/YAPILACAKLAR.md` #17), hover olmadıkça etiket yok
+  (1.08 — bkz. [[Arayuz]] § Sol ray), hover olmadıkça etiket yok
 - **Sol panel:** gereksiz düğme yok
 - **Sağ panel:** her zaman cam
 - **Alt panel:** asla kalabalık yapma

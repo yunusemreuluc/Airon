@@ -19,7 +19,7 @@ import {
 import { playSfx } from '@/services/sfxPlayer';
 import { GlassPanel } from './GlassPanel';
 
-// AIRON Vision paneli — CLAUDE.md § RIGHT PANEL (Vision / Camera / Object
+// AIRON Vision paneli — Notes/Tasarim-Kurallari.md § Panel yerleşimi (Vision / Camera / Object
 // Detection). Kullanıcı isteğiyle (2026-07-30) sıfırdan yazıldı.
 //
 // Backend zaten kameranın karelerini `webcam_frame` olayıyla yayınlıyordu ama
@@ -262,7 +262,11 @@ function VisionCard({
               visible.map(
                 (detection) =>
                   detection.box && (
-                    <BoxOverlay key={detection.label} box={detection.box} label={detection.displayName} />
+                    <BoxOverlay
+                      key={detection.label}
+                      box={detection.box}
+                      label={detection.displayName}
+                    />
                   ),
               )}
             {mode === 'text' &&
@@ -393,13 +397,7 @@ function EmptyFrame({ active, available }: { active: boolean; available: boolean
  *  paylaştığı için tek bileşen ikisine de hizmet ediyor; fark yalnızca
  *  etiketin olup olmaması (OCR'da metnin kendisi zaten aşağıda okunuyor,
  *  kutunun üstünde tekrar etmek kareyi doldururdu). */
-function BoxOverlay({
-  box,
-  label,
-}: {
-  box: [number, number, number, number];
-  label?: string;
-}) {
+function BoxOverlay({ box, label }: { box: [number, number, number, number]; label?: string }) {
   const [x1, y1, x2, y2] = box;
   const left = Math.min(x1, x2) * 100;
   const top = Math.min(y1, y2) * 100;

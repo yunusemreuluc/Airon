@@ -99,9 +99,7 @@ export function EnergyTendrils() {
     // yoksa Aıron konuşurken yeşil bir çekirdeğin etrafında mavi bir toz bulutu
     // dönerdi.
     const isAsleep = usePowerStore.getState().powerState === 'asleep';
-    const palette = isAsleep
-      ? SLEEP_PALETTE
-      : STATE_PALETTE[useAIStateStore.getState().aiState];
+    const palette = isAsleep ? SLEEP_PALETTE : STATE_PALETTE[useAIStateStore.getState().aiState];
     dampColor(material.uniforms.uColor.value, palette.corona, delta);
 
     // Uyku sönümlemesi ile açılış AYRI tutuluyor: sönümleme kendi hedefine

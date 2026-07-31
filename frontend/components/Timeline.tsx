@@ -14,7 +14,7 @@ import { useTimelineStore, type TimelineEntry } from '@/stores/timelineStore';
 import { AI_STATE_LABELS, useAIStateStore } from '@/stores/aiStateStore';
 import { GlassPanel } from './GlassPanel';
 
-// AIRON alt zaman çizelgesi — CLAUDE.md § BOTTOM PANEL
+// AIRON alt zaman çizelgesi — Notes/Tasarim-Kurallari.md § Panel yerleşimi
 // (Timeline / Reasoning / Tasks / Progress / Logs) + "Never clutter."
 //
 // "Never clutter" burada belirleyici oldu: panel VARSAYILAN OLARAK KAPALI, alt

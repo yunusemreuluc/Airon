@@ -10,7 +10,7 @@ import { dampColor, SLEEP_PALETTE, STATE_PALETTE } from './palette';
 import { getRevealProgress } from './reveal';
 import { ENERGY_CORE_FRAGMENT_SHADER, ENERGY_CORE_VERTEX_SHADER } from './shaders/energyCore';
 
-// CLAUDE.md § ENERGY CORE — "The center of AIRON is alive... It constantly
+// Notes/Tasarim-Kurallari.md § Enerji çekirdeği — "The center of AIRON is alive... It constantly
 // breathes, rotates slowly, emits particles, changes glow."
 // Durum davranışı: konuşurken çekirdek büyür, dinlerken nabız hızlanır,
 // düşünürken parıltı kısılır ve yüzey sakinleşir, görü sırasında yüzey
@@ -21,7 +21,7 @@ const FLOAT_SPEED = 0.6;
 const BREATH_SPEED = 0.7;
 const REACT_DAMPING = 4;
 const BASE_DISTORTION = 0.16;
-// CLAUDE.md § MOTION — "Energy core follows the cursor subtly". Kameranın
+// Notes/Tasarim-Kurallari.md § Hareket (fare) — "Energy core follows the cursor subtly". Kameranın
 // takibi CameraRig'de; burada çekirdeğin kendisi üzerine gelince hafifçe tepki veriyor.
 const HOVER_INTENSITY_BOOST = 0.22;
 const HOVER_SCALE_BOOST = 0.05;
@@ -50,9 +50,17 @@ const SLEEP_DISTORTION = 0.035;
 const SLEEP_ROTATION_MULTIPLIER = 0.16;
 const SLEEP_BREATH_MULTIPLIER = 0.32;
 
+// ── Beş tepki (2026-07-31, Notes/Arayuz.md § Beş tepki) ────────────────────────────────
+// `automation` ve `memory` sahnede BİRBİRİNİN ZITTI olacak şekilde ayarlandı:
+// otomasyon hızlı/sıkı/pürüzsüz (bir makine dönüyor), hafıza yavaş/geniş/
+// dalgalı (derinden bir şey yüzeye çıkıyor). Tek başına renk yetmezdi — renk
+// körlüğünde ya da göz ucuyla bakıldığında ayrımı taşıyan şey HAREKET.
+
 function getBreathSpeedMultiplier(state: AIState): number {
   if (state === 'listening') return 1.7;
   if (state === 'thinking') return 0.6;
+  if (state === 'automation') return 1.25; // iş temposu — telaşlı değil, kararlı
+  if (state === 'memory') return 0.42; // derin ve yavaş nefes
   return 1;
 }
 
@@ -61,19 +69,39 @@ function getExtraIntensity(state: AIState): number {
   // olduğu dalga boyu: aynı sayısal yoğunlukta maviden belirgin şekilde daha
   // parlak görünüyor ve bloom'la birlikte fosforlu kaleme dönüyordu.
   if (state === 'speaking') return 0.32;
+  // Kehribar da sıcak ve parlak algılanıyor; yeşille aynı gerekçeyle frenli.
+  if (state === 'automation') return 0.24;
   if (state === 'vision') return 0.18;
   if (state === 'thinking') return -0.15;
+  // Hatırlamak parlamak değil: çekirdek hafifçe kısılıyor, ışık dışarı değil
+  // içeri gidiyor gibi okunsun.
+  if (state === 'memory') return -0.08;
   return 0;
 }
 
 function getTargetDistortion(state: AIState): number {
   if (state === 'vision') return 0.32; // veri akışı — daha türbülanslı yüzey
+  if (state === 'memory') return 0.26; // derinden yüzeye çıkan bir şey
   if (state === 'thinking') return 0.08; // sakin, az dalgalı
+  if (state === 'automation') return 0.07; // makine yüzeyi: pürüzsüz, kararlı
   return BASE_DISTORTION;
 }
 
 function getExtraScale(state: AIState): number {
-  return state === 'speaking' ? 0.14 : 0;
+  if (state === 'speaking') return 0.14;
+  if (state === 'automation') return -0.05; // sıkışmış, odaklanmış
+  if (state === 'memory') return 0.06; // hatırlarken hafifçe açılıyor
+  return 0;
+}
+
+// Dönüş hızı: otomasyonun asıl imzası. Renk "bir şey değişti" der, HIZ "Aıron
+// şu an senin makinende çalışıyor" der — kullanıcı ekrana bakmıyorken bile göz
+// ucuyla yakalanan sinyal bu.
+function getRotationMultiplier(state: AIState): number {
+  if (state === 'automation') return 2.4;
+  if (state === 'memory') return 0.4;
+  if (state === 'thinking') return 0.7;
+  return 1;
 }
 
 export function EnergyCore() {
@@ -81,6 +109,10 @@ export function EnergyCore() {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const breathPhaseRef = useRef(0);
   const hoveredRef = useRef(false);
+  // Dönüş hızı de sönümleniyor, doğrudan atanmıyor: 1×'ten 2.4×'e ANINDA
+  // geçmek küreyi bir motor gibi tekletiyor. "Never use linear movement"
+  // (Notes/Tasarim-Kurallari.md § Animasyon) hız değişimi için de geçerli.
+  const rotationMultiplierRef = useRef(1);
 
   // Ref üzerinden mutasyon — useFrame'de her karede güncellenen değerler için
   // React'in kendi önerdiği kaçış yolu (useMemo çıktısını sonradan değiştirmek
@@ -107,9 +139,7 @@ export function EnergyCore() {
 
     // Nefes alma fazı biriktirilerek ilerliyor (ham elapsedTime değil) — böylece
     // AI durumu değişince nefes hızı sıçrama yapmadan, yumuşakça değişiyor.
-    const breathMultiplier = isAsleep
-      ? SLEEP_BREATH_MULTIPLIER
-      : getBreathSpeedMultiplier(aiState);
+    const breathMultiplier = isAsleep ? SLEEP_BREATH_MULTIPLIER : getBreathSpeedMultiplier(aiState);
     breathPhaseRef.current += delta * BREATH_SPEED * breathMultiplier;
     const breath = Math.sin(breathPhaseRef.current);
 
@@ -143,7 +173,13 @@ export function EnergyCore() {
       delta,
     );
 
-    mesh.rotation.y += delta * ROTATION_SPEED * (isAsleep ? SLEEP_ROTATION_MULTIPLIER : 1);
+    rotationMultiplierRef.current = THREE.MathUtils.damp(
+      rotationMultiplierRef.current,
+      isAsleep ? SLEEP_ROTATION_MULTIPLIER : getRotationMultiplier(aiState),
+      REACT_DAMPING,
+      delta,
+    );
+    mesh.rotation.y += delta * ROTATION_SPEED * rotationMultiplierRef.current;
     // Süzülme uykuda da sürüyor (sadece nefes yavaşlıyor): tamamen durursa
     // çekirdek canlı bir cisim değil, donmuş bir kare gibi görünüyor.
     mesh.position.y = Math.sin(t * FLOAT_SPEED) * FLOAT_AMPLITUDE;

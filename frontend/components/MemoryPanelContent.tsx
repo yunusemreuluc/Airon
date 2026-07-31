@@ -29,7 +29,9 @@ export function MemoryPanelContent() {
   }, []);
 
   if (failed) {
-    return <p className="text-foreground-secondary text-xs">Hafıza okunamadı — Aıron çalışıyor mu?</p>;
+    return (
+      <p className="text-foreground-secondary text-xs">Hafıza okunamadı — Aıron çalışıyor mu?</p>
+    );
   }
   if (!snapshot) {
     return <p className="text-foreground-disabled text-xs">Hafıza okunuyor...</p>;
@@ -37,8 +39,8 @@ export function MemoryPanelContent() {
   if (snapshot.total === 0) {
     return (
       <p className="text-foreground-secondary text-xs leading-relaxed">
-        Hafıza boş. Aıron sana dair bir şey öğrendiğinde (ya da ona &ldquo;bunu
-        hatırla&rdquo; dediğinde) burada birikmeye başlar.
+        Hafıza boş. Aıron sana dair bir şey öğrendiğinde (ya da ona &ldquo;bunu hatırla&rdquo;
+        dediğinde) burada birikmeye başlar.
       </p>
     );
   }

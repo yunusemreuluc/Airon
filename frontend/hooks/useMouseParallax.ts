@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 // Mouse Interaction: Depth, Parallax.
-// CLAUDE.md § MOTION — "Panels react slightly." Çok küçük bir kayma
+// Notes/Tasarim-Kurallari.md § Hareket (fare) — "Panels react slightly." Çok küçük bir kayma
 // (birkaç piksel, "never exaggerated") — React state kullanmıyor (mousemove
 // başına re-render olmasın diye), doğrudan DOM transform'unu güncelliyor.
 // Performans: prefers-reduced-motion'da sürekli rAF döngüsü hiç

@@ -74,7 +74,7 @@ export function TrayControl() {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         whileTap={{ scale: 0.94 }}
-        // CLAUDE.md § ANIMATION RULES — "Everything moves. Nothing feels
+        // Notes/Tasarim-Kurallari.md § Animasyon — "Everything moves. Nothing feels
         // static." Çok yavaş bir nefes: köşede duran ölü bir ikon değil.
         animate={{ opacity: [0.82, 1, 0.82] }}
         transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }}

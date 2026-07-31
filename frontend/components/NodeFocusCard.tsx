@@ -20,8 +20,7 @@ export function NodeFocusCard() {
   // "Görme" düğümü BİLEREK dışarıda: ona tıklandığında bu genel açıklama kartı
   // yerine gerçek Vision paneli açılıyor (kullanıcı isteği, 2026-07-31).
   // Modülün kendisi varken onu anlatan bir kart göstermek anlamsız olurdu.
-  const node =
-    ORBIT_NODES.find((n) => n.id === focusedNodeId && n.id !== 'vision') ?? null;
+  const node = ORBIT_NODES.find((n) => n.id === focusedNodeId && n.id !== 'vision') ?? null;
 
   return (
     <AnimatePresence>

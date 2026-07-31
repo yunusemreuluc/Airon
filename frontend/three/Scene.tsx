@@ -8,6 +8,7 @@ import { CAMERA_DISTANCE, CameraRig } from './CameraRig';
 import { ElectricArcs } from './ElectricArcs';
 import { EnergyCore } from './EnergyCore';
 import { EnergyTendrils } from './EnergyTendrils';
+import { FrameProbe } from './FrameProbe';
 import { Lighting } from './Lighting';
 import { NodeConnections } from './NodeConnections';
 import { OrbitNodes } from './OrbitNodes';
@@ -56,6 +57,9 @@ export function Scene() {
       <NodeConnections />
       <OrbitNodes />
       <PostProcessing />
+      {/* Kare süresi sondası — `window.__aironFps()` ile okunuyor. Kare başına
+          tek bir dizi yazması; sahneyi görsel olarak etkilemiyor. */}
+      <FrameProbe />
 
       <Suspense fallback={null}>
         <Environment preset="night" environmentIntensity={0.25} />

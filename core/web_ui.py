@@ -39,7 +39,71 @@ STATE_MAP = {
     "THINKING": "thinking",
     "SPEAKING": "speaking",
     "VISION": "vision",
+    "AUTOMATION": "automation",
+    "MEMORY": "memory",
 }
+
+# ── Araç → çekirdek durumu (2026-07-31, bkz. Notes/Arayuz.md § Beş tepki) ────────────
+# Notes/Tasarim-Kurallari.md § Enerji çekirdeği beş tepki istiyor: Ses, Düşünme,
+# Görü, Otomasyon, Hafıza. Gerçekte üçü çalışıyordu: HER araç çağrısı "THINKING"
+# yayınlıyordu, yani Aıron'un ekranı ele geçirmesiyle hava durumuna bakması
+# sahnede birebir aynı görünüyordu. "VISION" ise STATE_MAP'te duruyor ama
+# main.py hiçbir zaman göndermiyordu — ölü bir daldı.
+#
+# BEYAZ LİSTE, kara liste değil: burada adı geçmeyen araç "THINKING"e düşüyor.
+# Yeni bir araç eklenip buraya yazılmazsa davranışı BUGÜNKÜYLE aynı olur —
+# sessizce yanlış bir durum göstermez, sadece daha az özel olur. Kapsamlı eşleme
+# zorunlu tutulsaydı araç eklemenin maliyeti beşinci bir dosya olurdu
+# (bkz. CLAUDE.md § Adding a new tool — dört yer, fazlası değil).
+
+# Aıron kendi belleğine yazıyor ya da ondan okuyor.
+_MEMORY_TOOLS = frozenset({
+    "save_memory",
+    "delete_memory",
+    "get_daily_activity",
+    "learn_object",  # "şunu tanı" — sonraki oturumlar için kalıcı kayıt
+    "save_whatsapp_contact",
+})
+
+# Aıron makineye ya da dış dünyaya DOKUNUYOR (okumakla yetinmiyor). Ayrım okuma/
+# yazma: `get_calendar_events` düşünme, `add_calendar_event` otomasyon.
+_AUTOMATION_TOOLS = frozenset({
+    "gemini_desktop_task",
+    "intervene_screen",
+    "shell_run",
+    "open_app",
+    "browser_control",
+    "play_media",
+    "control_power",
+    "toggle_webcam",
+    "send_whatsapp_message",
+    "add_reminder",
+    "add_calendar_event",
+    "delete_calendar_event",
+    "start_watch",
+    "stop_watch",
+    "start_daily_briefing",
+    "stop_daily_briefing",
+})
+
+# Aıron BAKIYOR — kameradan ya da ekrandan.
+_VISION_TOOLS = frozenset({
+    "analyze_screen",
+    "recognize_objects",
+    "read_text",
+    "analyze_video",
+})
+
+
+def state_for_tool(name: str) -> str:
+    """Çalışmak üzere olan aracın çekirdekte hangi durum olarak görüneceği."""
+    if name in _MEMORY_TOOLS:
+        return "MEMORY"
+    if name in _AUTOMATION_TOOLS:
+        return "AUTOMATION"
+    if name in _VISION_TOOLS:
+        return "VISION"
+    return "THINKING"
 
 # Webcam önizlemesi main.py'de ~24 FPS güncelleniyor. Her kareyi base64'e çevirip
 # WebSocket'ten yollamak bant genişliğini ve CPU'yu boşuna yakar — önizleme için
@@ -235,6 +299,17 @@ class WebUI:
         # kutusu açılmalı; bunu ayrıca bildirmezsek arayüz "bağlanıyor"da kalırdı.
         if state == "LISTENING" and previous != "LISTENING":
             self._emit_status()
+
+    def set_tool_state(self, name: str) -> None:
+        """Bir araç çalışmaya başlarken çekirdeği o işin durumuna alır.
+
+        Modül düzeyindeki `state_for_tool` üzerinden geçiyor ama main.py oradan
+        değil BURADAN çağırıyor: `core.web_ui` yalnızca TYPE_CHECKING altında
+        import ediliyor (fastapi + websocket zincirini açılışta yüklememek için,
+        bkz. Notes/Kurulum-ve-Baslatma.md — 340→139 MB). Serbest fonksiyonu
+        doğrudan import etmek o kazancı geri verirdi; `self.ui` zaten elde.
+        """
+        self.set_state(state_for_tool(name))
 
     def write_log(self, text: str) -> None:
         """Sohbet satırı. Metnin KENDİSİ durumu da belirler: "Siz:" ile başlayan

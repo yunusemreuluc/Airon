@@ -30,7 +30,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 ];
 
 // Hover'da isim gösteren yuvarlak ikon düğmesi — hem modül ikonları hem alttaki
-// bildirim/profil için ortak (CLAUDE.md § SIDEBAR: "Icons only... No labels unless
+// bildirim/profil için ortak (Notes/Tasarim-Kurallari.md § Panel yerleşimi: "Icons only... No labels unless
 // hovered").
 //
 // Aktiflik göstergesi (2026-07-28, "daha profesyonel"): önceki dolgu + geniş sarı
@@ -50,20 +50,15 @@ function RailButton({
 }) {
   const [isHovered, setIsHovered] = useState(false);
 
+  // YAPI NOTU (2026-07-31): aktiflik hattı ve etiket balonu artık butonun DIŞINDA,
+  // saran kutuda duruyor. Sebep hover büyümesi: ölçek butona uygulanıyor ve
+  // ikisi de içeride kalsaydı onlar da büyürdü — `layoutId` ile animasyonlu hat
+  // ölçeklenmiş bir kutuda ölçüldüğü için modül değişiminde yanlış konuma
+  // akardı, etiket balonundaki yazı da 11px'ten oynardı. Saran kutu butonla
+  // aynı geometride olduğu için `left-full` / `-left-[13px]` konumları aynen
+  // geçerli kalıyor.
   return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-current={isActive ? 'true' : undefined}
-      onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className={`ease-out-quint relative flex h-10 w-10 items-center justify-center rounded-[14px] transition-all duration-200 ${
-        isActive
-          ? 'text-primary bg-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_18px_rgba(127,178,255,0.18)]'
-          : 'text-foreground-secondary hover:text-foreground hover:bg-white/[0.05]'
-      }`}
-    >
+    <div className="relative flex items-center">
       {isActive && (
         <motion.span
           layoutId="rail-active-indicator"
@@ -72,7 +67,26 @@ function RailButton({
           transition={{ type: 'spring', stiffness: 420, damping: 34 }}
         />
       )}
-      <Icon size={19} strokeWidth={1.6} />
+      <button
+        type="button"
+        aria-label={label}
+        aria-current={isActive ? 'true' : undefined}
+        onClick={onClick}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        // Notes/Tasarim-Kurallari.md § Panel yerleşimi — "hover'da hafifçe büyür".
+        // 1.08: 40px'lik bir düğmede ~3px, yani hissedilen ama ölçülmesi zor bir
+        // fark. Daha fazlası rayı zıplatıyor, daha azı fark edilmiyor.
+        // `active:scale-95` bastırma geri bildirimi: büyüme varsa basmanın da
+        // karşılığı olmalı, yoksa düğme hover'da canlı, tıklamada ölü hissediyor.
+        className={`ease-out-quint flex h-10 w-10 items-center justify-center rounded-[14px] transition-all duration-200 hover:scale-[1.08] active:scale-95 ${
+          isActive
+            ? 'text-primary bg-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_18px_rgba(127,178,255,0.18)]'
+            : 'text-foreground-secondary hover:text-foreground hover:bg-white/[0.05]'
+        }`}
+      >
+        <Icon size={19} strokeWidth={1.6} />
+      </button>
       <span
         className={`node-label-card text-foreground pointer-events-none absolute left-full z-30 ml-3.5 px-2.5 py-1.5 text-[11px] font-medium tracking-[0.06em] whitespace-nowrap transition-all duration-200 ${
           isHovered ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0'
@@ -80,7 +94,7 @@ function RailButton({
       >
         {label}
       </span>
-    </button>
+    </div>
   );
 }
 
@@ -129,7 +143,7 @@ export function Sidebar() {
           type="button"
           title="Kullanıcı"
           aria-label="Kullanıcı"
-          className="border-border-subtle text-foreground-secondary hover:border-border-strong hover:text-foreground flex h-9 w-9 items-center justify-center rounded-full border bg-white/[0.04] transition-all duration-200"
+          className="border-border-subtle text-foreground-secondary hover:border-border-strong hover:text-foreground ease-out-quint flex h-9 w-9 items-center justify-center rounded-full border bg-white/[0.04] transition-all duration-200 hover:scale-[1.08] active:scale-95"
         >
           <LuUserRound size={15} strokeWidth={1.6} />
         </button>

@@ -61,34 +61,16 @@ Recognition ✗**.
 Yeni ve ağır bir bağımlılık gerekiyor (InsightFace ya da dlib) ve gizlilik
 açısından hassas — kimin yüzünün nerede saklanacağı ayrıca kararlaştırılmalı.
 
-## 15. Çekirdek: otomasyon ve hafıza durumları
-`CLAUDE.md` § ENERGY CORE çekirdeğin beş şeye tepki vermesini istiyor: Voice,
-Thinking, Vision, **Automation**, **Memory**. Şu an `AIState` beş değer taşıyor
-ama otomasyon çalışırken çekirdek "thinking"e düşüyor (ayrı hâli yok) ve hafıza
-erişiminin hiç karşılığı yok.
+## 19. Ray etiketi AIRON imzasının üstüne biniyor
+Sol raydaki ilk düğmenin hover etiketi ("Hafıza") ile sol üstteki `BrandBadge`
+**19×9 px çakışıyor** (ölçüldü, 2026-07-31). Etiket kendi cam kartının üstünde
+durduğu için okunuyor ama arkasından AIRON yazısı taşıyor.
 
-Yapılacak: `AIState`'e iki değer eklemek, `core/web_ui.py`'deki `STATE_MAP`'i
-genişletmek ve `three/palette.ts` ile animasyon çarpanlarına karşılıklarını
-yazmak.
-
-## 16. Telemetride internet ve saat
-`CLAUDE.md` § TOP BAR sekiz alan istiyor. Şerit şu an CPU/RAM/Disk/Pil
-gösteriyor; AI durumu `BrandBadge`'de, mikrofon dock'ta.
-
-- **İnternet ve saat** — yapılabilir, yapılmadı
-- **GPU ve sıcaklık** — `psutil` Windows'ta ikisini de güvenilir vermiyor
-  (`sensors_temperatures` çoğu masaüstünde boş döner, GPU için ayrı bir satıcı
-  kütüphanesi gerekir). Uydurmak yerine gösterilmiyor; istenirse ayrı bir
-  bağımlılık kararı gerekir.
-
-## 17. Sidebar hover büyümesi
-`CLAUDE.md` § SIDEBAR: "Hover expands slightly". Şu an yalnızca renk ve arka
-plan değişiyor, **boyut değişmiyor**. Küçük bir iş.
-
-## 18. 60 FPS ölçümü
-`CLAUDE.md` § PERFORMANCE hedefi 60 FPS ama **hiç ölçülmedi** — yapılmamış bir
-iş değil, doğrulanmamış bir iddia. Gerçek pencerede (WebView2) ve en yoğun
-hâlde (Vision paneli açık + tarama + tüm paneller) ölçülmeli.
+Yeni bir hata değil — etiket baştan beri oradaydı, #17 sırasında bakarken
+görüldü. Basit bir kaydırma çözmüyor: imzayı sağa itmek "Otomasyon" gibi daha
+uzun etiketlerde yine çakışır, aşağı itmek ikinci düğmenin etiketine denk
+gelir. Ya imza başka bir yere taşınacak ya da ray etiketi bir hover'da imzayı
+soldurmalı — **yerleşim kararı gerekiyor.**
 
 ---
 

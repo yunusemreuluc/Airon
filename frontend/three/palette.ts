@@ -56,12 +56,57 @@ const PLASMA_TEAL: CorePalette = {
   corona: '#8ae8c8',
 };
 
+/**
+ * Otomasyon — Aıron makineye DOKUNUYOR (ekran müdahalesi, uygulama açma,
+ * kabuk komutu). 2026-07-31, bkz. Notes/Arayuz.md § Beş tepki.
+ *
+ * Kehribar seçildi çünkü sahnede kullanılmayan tek aile o: ICE mavi, konuşma
+ * turkuaz, uyku çelik. Ama asıl gerekçe anlamsal — kehribar her arayüzde
+ * "dikkat, makine hareket ediyor" demek. Aıron'un fareyi ele aldığı an
+ * kullanıcının bunu ANINDA fark etmesi gerekiyor; bu, dekorasyon değil uyarı.
+ *
+ * Kırmızıya kaçılmadı: kırmızı "hata" der, oysa burada her şey yolunda.
+ * Doygunluk PLASMA_TEAL'inkiyle aynı hizada — bloom altında beyaza kırpılmaması
+ * için (bkz. PostProcessing.tsx).
+ */
+const SOLAR_AMBER: CorePalette = {
+  bodyDeep: '#3d2408',
+  bodyLight: '#e0a355',
+  rim: '#fff0d6',
+  corona: '#f0c489',
+};
+
+/**
+ * Hafıza — Aıron kendi belleğine uzanıyor (kayıt, silme, "şunu tanı").
+ *
+ * Mor, tayfın soğuk ucunda ve mavinin ÖTESİNDE: ICE ile aynı yönde ama daha
+ * derinde. Amaçlanan okuma bu — hafıza dışarıdaki bir iş değil, çekirdeğin
+ * kendi içine bakması. Kehribarın karşı kutbu, yani otomasyon ile hafıza
+ * yan yana geldiğinde asla karışmıyor.
+ *
+ * Gövde bilerek koyu: hatırlamak parlamak değil, derinden bir şey çıkarmak.
+ *
+ * Kenar (rim) diğer paletlerdeki gibi neredeyse beyaz DEĞİL, mora boyalı. İlk
+ * deneme `#ece4ff` idi ve ölçüm şunu gösterdi: fresnel kenarı kürenin parlak
+ * piksellerine hâkim olduğu için doygunluk %15'e düşüyor, yani mor durum
+ * sahnenin en soluk hâli oluyordu. Renk burada bilgi taşıyor — solmasına
+ * izin verilemez.
+ */
+const DEEP_VIOLET: CorePalette = {
+  bodyDeep: '#2a1650',
+  bodyLight: '#9c6ef0',
+  rim: '#dcc9ff',
+  corona: '#c3a2ff',
+};
+
 export const STATE_PALETTE: Record<AIState, CorePalette> = {
   idle: ICE,
   listening: ICE,
   thinking: ICE,
   speaking: PLASMA_TEAL,
   vision: ICE,
+  automation: SOLAR_AMBER,
+  memory: DEEP_VIOLET,
 };
 
 /**
@@ -78,7 +123,7 @@ export const SLEEP_PALETTE: CorePalette = {
   corona: '#2b3c54',
 };
 
-// Renk geçişinin yumuşaklığı. CLAUDE.md § ANIMATION RULES — "Never use linear
+// Renk geçişinin yumuşaklığı. Notes/Tasarim-Kurallari.md § Animasyon — "Never use linear
 // movement": üstel sönümleme, kare hızından bağımsız.
 const COLOR_DAMPING = 2.6;
 

@@ -9,7 +9,7 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 //
 // Kullanıcı isteğiyle (2026-07-31) yeniden tasarlandı. Önceki sürüm siyah bir
 // ekranda AIRON yazısı ve dolan bir ilerleme çubuğuydu: bu bir YÜKLEME EKRANI
-// dili ve AIRON'un dünyasına ait değil (CLAUDE.md § PROJE — "bir gösterge
+// dili ve AIRON'un dünyasına ait değil (CLAUDE.md § PROJECT — "bir gösterge
 // paneli DEĞİLDİR"). Sonrasındaki 3D kuruluş zaten iyiydi; sorun ondan
 // öncesiydi.
 //
@@ -128,7 +128,7 @@ export function BootOverlay() {
           }
         >
           {reducedMotion ? (
-            <span className="text-foreground text-4xl font-semibold tracking-[0.4em] pl-[0.4em]">
+            <span className="text-foreground pl-[0.4em] text-4xl font-semibold tracking-[0.4em]">
               AIRON
             </span>
           ) : (
@@ -161,8 +161,7 @@ export function BootOverlay() {
               <motion.span
                 className="absolute h-24 w-24 rounded-full"
                 style={{
-                  background:
-                    'radial-gradient(circle, rgba(127,178,255,0.55), transparent 70%)',
+                  background: 'radial-gradient(circle, rgba(127,178,255,0.55), transparent 70%)',
                 }}
                 initial={{ scale: 0.2, opacity: 0 }}
                 animate={{ scale: [0.2, 1.6, 2.6], opacity: [0, 0.9, 0] }}

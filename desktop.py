@@ -72,7 +72,7 @@ TRAY_ICON_PATH = BASE_DIR / "Icon" / "airon-tray.png"
 # gösterir. Bu sabit uygulamayı kendi kimliğine taşıyor.
 APP_USER_MODEL_ID = "Airon.Desktop"
 
-# Pencere: 3D sahne geniş ekranda tasarlandı (bkz. CLAUDE.md § RESPONSIVENESS —
+# Pencere: 3D sahne geniş ekranda tasarlandı (bkz. Notes/Tasarim-Kurallari.md § Duyarlılık —
 # 1366 en dar hedef). Minimum boyut bunun altına inmeyi engelliyor ki yerleşim
 # hiç bozulmasın.
 WINDOW_TITLE = "Aıron"

@@ -17,7 +17,7 @@ interface ModuleContent {
   content?: React.ComponentType;
 }
 
-// Sol panel. CLAUDE.md § LEFT PANEL: "no unnecessary buttons" — aksiyon butonu
+// Sol panel. Notes/Tasarim-Kurallari.md § Panel yerleşimi: "no unnecessary buttons" — aksiyon butonu
 // yok, sadece durum.
 //
 // 2026-07-30'da Hafıza ve Otomasyon gerçek veriye bağlandı (backend/api/memory.py,

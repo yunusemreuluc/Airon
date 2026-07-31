@@ -809,7 +809,10 @@ class AironLive:
         name = fc.name
         args = dict(fc.args or {})
         logger.info(f"[AIRON] 🔧 {name} {args}")
-        self.ui.set_state("THINKING")
+        # Her araç "THINKING" değil: ekranı ele geçirmek (AUTOMATION), belleğe
+        # yazmak (MEMORY) ve kameraya bakmak (VISION) çekirdekte ayrı görünüyor.
+        # Sınıflandırma core/web_ui.py'de — bkz. state_for_tool.
+        self.ui.set_tool_state(name)
 
         loop = asyncio.get_event_loop()
         had_exception = False

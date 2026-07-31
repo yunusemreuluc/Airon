@@ -4,7 +4,7 @@ interface GlassButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
 }
 
-// CLAUDE.md § UI STYLE — "Large radius, soft glow, glass background.
+// Notes/Tasarim-Kurallari.md § Arayüz stili — "Large radius, soft glow, glass background.
 // Hover: Glow, lift, scale 1.02. Click: scale 0.98. Duration: 200ms."
 //
 // 2026-07-28 düzenlemesi: hover'da ölçek yerine ağırlıklı olarak kenarlık +

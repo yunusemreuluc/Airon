@@ -116,7 +116,11 @@ export function AutomationPanelContent() {
                 key={key}
                 className="border-border-subtle flex items-center gap-2.5 rounded-[10px] border bg-white/[0.03] px-2.5 py-2"
               >
-                <LuClock size={12} strokeWidth={1.8} className="text-foreground-disabled shrink-0" />
+                <LuClock
+                  size={12}
+                  strokeWidth={1.8}
+                  className="text-foreground-disabled shrink-0"
+                />
                 <span className="text-foreground text-[11px] break-words">
                   {readBriefingValue(value)}
                 </span>

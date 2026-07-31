@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { useNodeFocusStore } from '@/stores/nodeFocusStore';
 import { readOrbitNodePosition } from './nodeData';
 
-// CLAUDE.md § MOTION — fare ile derinlik/perspektif, asla abartılı.
+// Notes/Tasarim-Kurallari.md § Hareket (fare) — fare ile derinlik/perspektif, asla abartılı.
 // Mouse Parallax, Smooth Orbit, Idle Motion.
 const IDLE_ORBIT_SPEED = 0.06; // rad/sn — çok yavaş, fark edilir ama dikkat dağıtmaz
 const IDLE_ORBIT_X = 0.4;
@@ -88,12 +88,7 @@ export function CameraRig() {
       focusLook.current.x += FOCUS_FRAME_SHIFT;
     }
 
-    focus.current = THREE.MathUtils.damp(
-      focus.current,
-      nodePosition ? 1 : 0,
-      FOCUS_DAMPING,
-      delta,
-    );
+    focus.current = THREE.MathUtils.damp(focus.current, nodePosition ? 1 : 0, FOCUS_DAMPING, delta);
     const focusAmount = focus.current;
 
     // ── Varsayılan kadraj ──
