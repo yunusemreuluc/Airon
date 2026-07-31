@@ -1,0 +1,40 @@
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+.claude/
+.swift-cache/
+.swift-home/
+
+config/api_keys.json
+memory/memory.json
+memory/phone_book.json
+# Gerçek konuşma günlüğü — tarih/saat damgalı diyalogların tamamı burada.
+# `.example.json` kardeşleri gibi görünüyor ama ÖRNEK DEĞİL, canlı veri.
+memory/activity_log.json
+
+# Obsidian'ın makineye özel düzen durumu (açık paneller, sidebar genişliği).
+# Ayarlar (app/appearance/core-plugins/graph) paylaşılıyor, bu paylaşılmıyor:
+# her açılışta değişip commit'leri gürültüye boğuyor.
+.obsidian/workspace.json
+
+# frontend/ (Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+frontend/*.tsbuildinfo
+
+# backend/ (FastAPI)
+backend/__pycache__/
+backend/**/__pycache__/
+
+# Büyük model ağırlıkları — ViT-B-32.pt tek başına 338MB, GitHub'ın 100MB
+# dosya limitini aşıyor. Git'te tutulmaz, gerektiğinde ayrıca indirilir/paylaşılır.
+weights/
+*.pt
+
+# Çalışma zamanı log dosyası
+logs/*.log
+config/window_state.json

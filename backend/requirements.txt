@@ -1,0 +1,5 @@
+# AIRON web backend — kök dizindeki requirements.txt'e EK, onun yerine değil.
+# Aynı venv içine kurulur:  pip install -r backend/requirements.txt
+
+fastapi
+uvicorn[standard]

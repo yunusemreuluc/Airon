@@ -1,0 +1,6 @@
+{
+  "userIgnoreFilters": [
+    "venv/",
+    "__pycache__/"
+  ]
+}

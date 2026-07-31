@@ -1,0 +1,30 @@
+# Aıron Windows — Gerekli paketler
+# Kurulum:  pip install -r requirements.txt
+
+google-genai          # Gemini Live API (ses + araç çağrıları)
+pyaudio               # Mikrofon / hoparlör (gerçek zamanlı ses)
+psutil                # Sistem bilgisi (pil, CPU, RAM, disk)
+Pillow                # Görüntü işleme (ekran + webcam analizi)
+requests              # Hava durumu, YouTube API, YouTube arama
+mss                   # Ekran görüntüsü yakalama (analyze_screen)
+opencv-python         # Webcam canlı akışı (toggle_webcam)
+pyperclip             # Pano kopyalama (WhatsApp otomasyonu)
+pyautogui             # WhatsApp Web otomatik gönderim (Enter)
+pygetwindow           # Pencere odaklama (intervene_screen — app_hint ile öne getirme)
+pystray               # Sistem tepsisine küçültme (arka planda dinlemeye devam)
+yt-dlp                # YouTube video indirme (analyze_video)
+ultralytics           # YOLO-World — yerel, açık-kelime dağarcıklı nesne tanıma (recognize_objects)
+easyocr               # Yerel OCR, Türkçe+İngilizce (read_text) — Gemini kotasına dokunmaz.
+                      #   DİKKAT: `pip install easyocr` opencv-python-headless çekiyor ve mevcut
+                      #   opencv-python'un cv2'sini ezmeye çalışıyor. Kurulumda dosya kilitliyse
+                      #   (Aıron açıkken) hata verir. Sorunsuz yol:
+                      #     pip install ninja lazy-loader imageio scikit-image
+                      #     pip install easyocr --no-deps
+                      #   Projenin kullandığı cv2 API'leri (VideoCapture/resize/flip/imencode)
+                      #   zaten opencv-python'da var, headless'a gerek yok.
+winsdk                # Windows toast bildirimlerini okuma (get_notifications) — WinRT Python projeksiyonu
+pywebview             # Masaüstü penceresi — 3D arayüzü WebView2'de açar (desktop.py)
+fastapi               # Web backend (backend/main.py) — arayüzü ve WebSocket'i sunar
+uvicorn               # backend'i çalıştıran ASGI sunucusu (desktop.py arka plan thread'i)
+pypdf                 # PDF içeriği okuma (summarize_file)
+python-docx           # Word (.docx) içeriği okuma (summarize_file)
