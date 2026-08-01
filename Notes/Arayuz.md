@@ -257,8 +257,35 @@ birlikte büyürlerdi — `layoutId` ile animasyonlu hat, ölçeklenmiş bir kut
 da oynardı. Doğrulandı: hover'da buton 40 → 43.2 px, etiket `scale: none` ve
 11 px, hat 2×20 sabit.
 
-**Bilinen çakışma:** ilk düğmenin etiketi `BrandBadge` ile 19×9 px örtüşüyor
-(`Docs/YAPILACAKLAR.md` #19).
+**Etiket çakışması — çözüldü (2026-08-01).** Ray etiketi ile sol üstteki AIRON
+imzası aynı yerde çiziliyordu (ilk düğmede 19×9 px; imzaya ambient bağlam satırı
+eklenince 37×30 px'e çıktı). Her ikisi de kendi bileşeninde yaşadığı için
+biri diğerinin varlığını bilmiyordu.
+
+Elenen alternatifler: imzayı **sağa** itmek "Otomasyon" gibi uzun etiketlerde
+yine çakışıyor; **aşağı** itmek ikinci düğmenin etiketine denk geliyor; rayın
+üstüne **boşluk** koymak rayın başında koca bir delik bırakıyor.
+
+Seçilen yol `stores/railHoverStore.ts`: raya yaklaşınca imza %15 opaklığa
+çekiliyor. Bu bir kaçamak değil, kasıtlı bir etkileşim — aynı anda iki şeyin
+dikkat istemesi yerine o an bakılan şey kazanıyor. Ölçüldü: hover'da imza 0.15,
+etiket 1.0; hover bitince imza 1.0.
+
+`onMouseLeave` koşulsuz `null` yazmıyor: bir düğmeden komşusuna geçerken
+tarayıcı `leave(A)`/`enter(B)` sırasını garanti etmiyor, `leave` sonra gelirse
+imza B'nin üstündeyken geri parlardı. Yalnızca hâlâ kendisi yazılıysa temizliyor.
+
+## Ambient bağlam satırı
+
+`BrandBadge`'in üçüncü satırı: **AIRON → durum → kullanıcının ne yaptığı.**
+Durum satırından bir kademe daha kısık, çünkü bu Aıron'un değil kullanıcının
+ne yaptığı — aynı vurguyla yazılsaydı ikisi tek cümle gibi okunurdu.
+
+Kaynak `GET /api/system/context`, `get_context` aracını besleyen fonksiyonun
+**aynısı** — ayrı yazılsalardı biri bayatlar ve arayüz olmayan bir farkındalığı
+varmış gibi gösterirdi. Okunamazsa satır hiç çizilmiyor.
+
+Ayrıntı: [[Ambient-Baglam]].
 
 ## Telemetri şeridi
 

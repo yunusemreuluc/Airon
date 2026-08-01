@@ -211,6 +211,34 @@ Doğrusu `page.evaluate` içinde **`getBoundingClientRect()`** — o transform'u
 `scale`'i de içeriyor. Teyit için `getComputedStyle(el).scale` de okunabilir;
 `transform` bakmak yanıltır, orada `none` yazıyor.
 
+## SwiftShader'da olaylar GECİKİYOR — 500 ms yetmez
+
+Headless Chromium + SwiftShader'da 3D sahne ana iş parçacığını doyuruyor;
+React olay işleme ve CSS geçişleri belirgin şekilde gecikiyor.
+
+2026-08-01: hover sonrası 500 ms bekleyen bir test "imza sönmüyor" dedi ve
+çalışan bir düzeltmeyi bozuk gösterdi. Aynı ölçüm **1500 ms** ile doğru sonucu
+verdi. Ara değerler ele veriyordu: opaklık `0.6117`, etiket `0.456823` — yani
+geçiş ortasında yakalanmıştı, hiç başlamamış değil.
+
+**Kural:** SwiftShader altında etkileşim ölçerken CSS geçiş süresinin en az
+5-6 katını bekle ve **ara değer** görürsen (0 ile 1 arasında) daha da uzat.
+Ayrıca sınıfın uygulanıp uygulanmadığını `className` ile AYRI doğrula —
+hesaplanan değer geçişten etkilenir, sınıf listesi etkilenmez.
+
+İlgili: § Playwright `bounding_box()` CSS `scale`'i görmüyor. İkisi de aynı
+dersin parçası — ölçüm aracının kendisi de test edilmeli.
+
+## Stylesheet'i tarayıp "bu sınıf yok" deme
+
+`document.styleSheets` üzerinde düz gezinip `.opacity-15` aramak
+**URETILMEMIS** dedi, oysa `getComputedStyle(...).opacity` `0.15` döndürüyordu.
+Tailwind v4 kuralları iç içe katmanlarda tutuyor; düz `cssRules` gezintisi
+hepsini görmüyor.
+
+Bir stilin uygulanıp uygulanmadığının yer gerçeği **`getComputedStyle`**, CSS
+metnini aramak değil.
+
 ## Kare hızı ölçümü kendi kendini doğrulamalı
 
 Halka tampon üzerinden alınan **ortanca** kare süresi tek başına yalan

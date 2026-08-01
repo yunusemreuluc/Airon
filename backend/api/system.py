@@ -124,6 +124,28 @@ async def telemetry() -> dict:
     return {"success": True, "message": "telemetri", "data": data}
 
 
+@router.get("/context")
+async def context() -> dict:
+    """Ambient bağlam — Aıron'un "kullanıcı şu an ne yapıyor" farkındalığı.
+
+    Aynı kaynağı `get_context` aracı da kullanıyor (actions/ambient_context.py):
+    araç modele, bu uç nokta arayüze. İkisi AYNI fonksiyondan besleniyor, yani
+    arayüzde gördüğün şey Aıron'un gerçekten bildiği şey — ayrı yazılsalardı
+    biri bayatlar ve arayüz olmayan bir farkındalığı varmış gibi gösterirdi
+    (bkz. Notes/Bilinen-Tuzaklar.md § Arayüzde dürüstlük).
+
+    Import fonksiyon İÇİNDE: `actions/` zinciri (psutil, ctypes) backend
+    açılışında değil, ilk istekte yükleniyor.
+    """
+    try:
+        from actions.ambient_context import describe_context, read_context
+
+        ham = read_context()
+        return {"success": True, "message": describe_context(ham), "data": ham}
+    except Exception as exc:
+        return {"success": False, "message": f"bağlam okunamadı: {exc}", "data": {}}
+
+
 class StateUpdate(BaseModel):
     state: str
 

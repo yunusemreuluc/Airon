@@ -2,6 +2,8 @@
 
 import { motion } from 'framer-motion';
 import { AI_STATE_LABELS, useAIStateStore, type AIState } from '@/stores/aiStateStore';
+import { useAmbientContext } from '@/hooks/useAmbientContext';
+import { useRailHoverStore } from '@/stores/railHoverStore';
 
 // Kullanıcı isteğiyle (2026-07-28) — üst panel tamamen kaldırıldı; AIRON adı ve
 // canlı durum sahnenin sol üstünde küçük, çerçevesiz bir imza olarak duruyor
@@ -29,11 +31,24 @@ const STATE_DOT: Record<AIState, { color: string; pulseSeconds: number }> = {
 export function BrandBadge() {
   const aiState = useAIStateStore((state) => state.aiState);
   const { color, pulseSeconds } = STATE_DOT[aiState];
+  const context = useAmbientContext();
+  // Ray etiketi imzanın ÜSTÜNE biniyor (ölçüldü, bkz. stores/railHoverStore.ts).
+  // Çakışmayı gizlemek yerine imza geri çekiliyor: o an bakılan şey kazanır.
+  const railHovered = useRailHoverStore((state) => state.hoveredLabel) !== null;
 
   return (
     // left-[104px]: Sidebar rayının (18px + 68px genişlik) hemen sağında, ondan
     // bir "nefes payı" bırakarak başlar.
-    <div className="pointer-events-none absolute top-7 left-[104px] z-30 flex flex-col gap-1.5">
+    //
+    // Sönme framer-motion ile DEĞİL Tailwind ile: bu düz bir div ve satır içi
+    // stil yazan bir motion bileşeni değil — tersi olsaydı satır içi opacity
+    // sınıfı ezerdi (bkz. Notes/Bilinen-Tuzaklar.md § framer-motion opacity'yi
+    // satır içi yazar).
+    <div
+      className={`pointer-events-none absolute top-7 left-[104px] z-30 flex flex-col gap-1.5 transition-opacity duration-200 ${
+        railHovered ? 'opacity-15' : 'opacity-100'
+      }`}
+    >
       <div className="flex items-center gap-3">
         <span className="relative flex h-1.5 w-1.5 items-center justify-center">
           <span
@@ -53,6 +68,17 @@ export function BrandBadge() {
         <span className="text-foreground text-[13px] font-semibold tracking-[0.42em]">AIRON</span>
       </div>
       <span className="label-micro pl-[18px]">{AI_STATE_LABELS[aiState]}</span>
+
+      {/* Ambient bağlam — Aıron'un farkında OLDUĞU şey (2026-08-01).
+          Durum satırından bir kademe daha kısık: bu Aıron'un ne yaptığı değil,
+          kullanıcının ne yaptığı. Aynı vurguyla yazılsaydı ikisi tek bir cümle
+          gibi okunurdu. Veri yoksa satır hiç çizilmiyor (bkz. useAmbientContext). */}
+      {context && (
+        <span className="text-foreground-disabled max-w-[260px] truncate pl-[18px] text-[10px] leading-none">
+          {context.app || context.windowTitle}
+          {context.away && ` · ${Math.floor(context.idleSeconds / 60)} dk uzakta`}
+        </span>
+      )}
     </div>
   );
 }

@@ -54,6 +54,7 @@ from actions.ocr import HAS_EASYOCR, lines_to_text, read_text_in_jpeg
 from actions.screen_vision import analyze_screen  # noqa: F401
 from actions.screen_control import intervene_screen  # noqa: F401
 from actions.screen_monitor import check_for_issue, get_active_window_title
+from actions.ambient_context import describe_context, get_context  # noqa: F401 — @register_tool yan etkisi için
 from actions.object_recognition import detect_objects_in_jpeg, describe_object_for_learning
 from actions.sys_info import check_health_thresholds
 from actions.screen_watch import check_watch_condition

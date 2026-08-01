@@ -13,6 +13,7 @@ import {
 } from 'react-icons/lu';
 import type { IconType } from 'react-icons';
 import { useNavigationStore, type ModuleId } from '@/stores/navigationStore';
+import { useRailHoverStore } from '@/stores/railHoverStore';
 import { GlassPanel } from './GlassPanel';
 
 interface SidebarItem {
@@ -72,8 +73,23 @@ function RailButton({
         aria-label={label}
         aria-current={isActive ? 'true' : undefined}
         onClick={onClick}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        // Yerel durum etiketi gösteriyor, store ise AIRON imzasına "çekil"
+        // diyor (bkz. stores/railHoverStore.ts) — ikisi aynı olayın iki ayrı
+        // sonucu, o yüzden birlikte set ediliyor.
+        onMouseEnter={() => {
+          setIsHovered(true);
+          useRailHoverStore.getState().setHoveredLabel(label);
+        }}
+        onMouseLeave={() => {
+          setIsHovered(false);
+          // Koşulsuz `null` YAZMA: bir düğmeden komşusuna geçerken tarayıcı
+          // leave(A) ile enter(B) olaylarını bu sırayla göndermeyi garanti
+          // etmiyor. leave(A) sonra gelirse, kullanıcı B'nin üstündeyken imza
+          // geri parlar ve etiketin altında kalırdı. Yalnızca hâlâ BİZ
+          // yazılıysak temizliyoruz.
+          const store = useRailHoverStore.getState();
+          if (store.hoveredLabel === label) store.setHoveredLabel(null);
+        }}
         // Notes/Tasarim-Kurallari.md § Panel yerleşimi — "hover'da hafifçe büyür".
         // 1.08: 40px'lik bir düğmede ~3px, yani hissedilen ama ölçülmesi zor bir
         // fark. Daha fazlası rayı zıplatıyor, daha azı fark edilmiyor.

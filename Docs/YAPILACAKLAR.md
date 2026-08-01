@@ -61,16 +61,16 @@ Recognition ✗**.
 Yeni ve ağır bir bağımlılık gerekiyor (InsightFace ya da dlib) ve gizlilik
 açısından hassas — kimin yüzünün nerede saklanacağı ayrıca kararlaştırılmalı.
 
-## 19. Ray etiketi AIRON imzasının üstüne biniyor
-Sol raydaki ilk düğmenin hover etiketi ("Hafıza") ile sol üstteki `BrandBadge`
-**19×9 px çakışıyor** (ölçüldü, 2026-07-31). Etiket kendi cam kartının üstünde
-durduğu için okunuyor ama arkasından AIRON yazısı taşıyor.
+## 20. Ambient bağlamı oturuma İTME yolu denenmedi
+`get_context` bugün **çekme** modelinde: model ihtiyaç duyunca çağırıyor
+(bkz. [[Ambient-Baglam]]). Sürekli enjeksiyon
+(`send_client_content(turn_complete=False)`) bilerek yapılmadı — SDK
+`send_realtime_input` ile karıştırmaya karşı uyarıyor ve açık bırakılan bir tur
+Aıron'u sese sağır bırakabilir.
 
-Yeni bir hata değil — etiket baştan beri oradaydı, #17 sırasında bakarken
-görüldü. Basit bir kaydırma çözmüyor: imzayı sağa itmek "Otomasyon" gibi daha
-uzun etiketlerde yine çakışır, aşağı itmek ikinci düğmenin etiketine denk
-gelir. Ya imza başka bir yere taşınacak ya da ray etiketi bir hover'da imzayı
-soldurmalı — **yerleşim kararı gerekiyor.**
+Denenecekse: kotanın bol olduğu bir anda, `_thinking_supported` desenindeki gibi
+bir güvenlik valfiyle (reddedilirse/susarsa anında kapat ve yeniden bağlan).
+Kazancı, modelin bağlamı çağırmayı unutamaması olurdu.
 
 ---
 

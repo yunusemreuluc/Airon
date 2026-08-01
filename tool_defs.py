@@ -386,6 +386,18 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "get_context",
+        "description": (
+            "Kullanıcının ŞU AN ne yaptığını söyler: hangi programda olduğu, aktif pencerenin "
+            "başlığı, klavye/fareye en son ne zaman dokunduğu ve saat. Tamamen yerel (Win32), "
+            "anında döner, hiç kota harcamaz — çekinmeden çağır. Kullanıcı 'bunu', 'şurayı', "
+            "'buradaki' gibi belirsiz bir şeyden bahsederse ya da 'ne yapıyorum', 'hangi "
+            "programdayım' diye sorarsa ÖNCE bunu çağır. Ekranın İÇİNİ GÖRMEZ; pencerede "
+            "yazanı okuman gerekiyorsa analyze_screen kullan."
+        ),
+        "parameters": {"type": "OBJECT", "properties": {}}
+    },
+    {
         "name": "get_notifications",
         "description": (
             "Windows Bildirim Merkezi'nde o an duran (okunmamış) sistem bildirimlerini okur — "
