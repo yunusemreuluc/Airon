@@ -13,6 +13,10 @@ const KIND_STYLE: Record<LogKind, { label: string; className: string }> = {
   error: { label: 'Hata', className: 'text-[#ff8f8f]' },
 };
 
+// "Alttayım" sayılmak için alta olan azami mesafe. Bir satır payı: kullanıcı
+// son mesajı görüyorsa yeni gelen de gösterilmeli.
+const PIN_THRESHOLD_PX = 80;
+
 export function ConversationLog() {
   const lines = useConversationStore((state) => state.lines);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -23,13 +27,32 @@ export function ConversationLog() {
   // istediğimiz şey.
   const hasJumpedToLatest = useRef(false);
 
+  // Kullanıcı listenin DİBİNDE mi — kaydırma olayında, yani YENİ MESAJ
+  // GELMEDEN ÖNCE ölçülüyor.
+  //
+  // BURASI ÖNCEDEN HATALIYDI (kullanıcı bildirdi, 2026-08-01): mesafe efektin
+  // içinde, yani yeni satır DOM'a girdikten SONRA ölçülüyordu. O anda ölçülen
+  // şey "kullanıcı alta ne kadar yakındı" değil, tam olarak YENİ EKLENEN
+  // İÇERİĞİN YÜKSEKLİĞİ oluyordu. Kısa bir satır (~40px) eşiği geçtiği için
+  // kaydırma çalışıyor, uzun bir cevap 80px'i aştığı için ÇALIŞMIYORDU —
+  // panel `max-h-56` (224px) olduğundan bu çok kolay oluyor. Sonuç: uzun
+  // mesajlar ekranın altında kalıyordu.
+  const isPinnedToBottom = useRef(true);
+
+  const handleScroll = () => {
+    const container = containerRef.current;
+    if (!container) return;
+    isPinnedToBottom.current =
+      container.scrollHeight - container.scrollTop - container.clientHeight < PIN_THRESHOLD_PX;
+  };
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     // AÇILIŞTA: doğrudan en alta atla (kullanıcı isteği, 2026-07-31).
-    // Buradaki hata şuydu: aşağıdaki "yalnızca zaten alttaysan kaydır" kuralı
-    // ilk açılışta ASLA sağlanmıyordu — panel yeni mount edildiğinde scrollTop
+    // Buradaki hata şuydu: "yalnızca zaten alttaysan kaydır" kuralı ilk
+    // açılışta ASLA sağlanmıyordu — panel yeni mount edildiğinde scrollTop
     // 0, yani alta olan mesafe tüm liste boyu kadar. Sonuç: sohbet her açılışta
     // en eski mesajdan başlıyordu.
     // `scrollTop` doğrudan atanıyor, scrollIntoView değil: animasyonsuz olmalı,
@@ -40,12 +63,14 @@ export function ConversationLog() {
       return;
     }
 
-    // Sonraki satırlarda: kullanıcı yukarı kaydırıp bir şey okuyorsa onu
-    // zorla aşağı çekme.
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    if (distanceFromBottom < 80) {
+    // Kullanıcının KENDİ mesajı her zaman alta çeker — mesajı gönderen kişi
+    // onu görmek ister, yukarıda bir şey okuyor olsa bile. Her sohbet
+    // uygulamasının davranışı bu.
+    const sentByUser = lines[lines.length - 1]?.kind === 'user';
+
+    if (sentByUser || isPinnedToBottom.current) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      isPinnedToBottom.current = true;
     }
   }, [lines]);
 
@@ -59,7 +84,11 @@ export function ConversationLog() {
   }
 
   return (
-    <div ref={containerRef} className="flex max-h-56 flex-col gap-2.5 overflow-y-auto pr-1">
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="flex max-h-56 flex-col gap-2.5 overflow-y-auto pr-1"
+    >
       {lines.map((line) => {
         const style = KIND_STYLE[line.kind];
         return (

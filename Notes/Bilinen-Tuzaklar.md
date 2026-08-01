@@ -211,6 +211,108 @@ Doğrusu `page.evaluate` içinde **`getBoundingClientRect()`** — o transform'u
 `scale`'i de içeriyor. Teyit için `getComputedStyle(el).scale` de okunabilir;
 `transform` bakmak yanıltır, orada `none` yazıyor.
 
+## Kotayı yakan şey araçlar değil, ekran bekçisiydi
+
+Gemini **ücretsiz katmanı günde 1500 istek** veriyor (Flash).
+`_watch_screen_for_issues` **25 saniyede bir** görü çağrısı atıyordu:
+
+```
+3600 / 25 = saatte 144 çağrı   →   1500 / 144 = 10.4 saat
+```
+
+Yani Aıron ~10 saat açık kalınca günlük kota, **kullanıcı tek kelime etmeden**
+biterdi. `gemini_desktop_task`, `search_files` ve `activity_log` maddelerinin
+üçünde de "test ederken kota dolmuştu" notu var — suçlu test edilen araç değil,
+arka planda sessizce dönen bekçiydi.
+
+**Ders:** proaktif bir bekçi eklerken "saatte kaç API çağrısı eder" hesabını
+kotayla birlikte yap. 25 saniye makul görünüyor ama günde 3456 çağrı demek.
+
+Çözüm ve ölçülen sonuçlar: [[Izleme-ve-Brifing]] § Kota bütçesi.
+
+## "Ekran sabitken fark küçüktür" — YANLIŞ
+
+Ekran bekçisinin çözümü olarak "görüntü değişmediyse Gemini'ye sorma" kapısı
+tasarlandı. Eşiği seçmeden önce ölçüldü ve varsayım çöktü.
+
+Gerçek masaüstünde **ardışık** ekran görüntüleri arasındaki ortalama fark
+(0-255 ölçeği, 96×96 gri tonlama): **4.5 / 5.5 / 16.7 / 17.4 / 22.1 / 54.8 /
+71.7**. Karşılaştırma için, ekranın ortasında **%30 genişliğinde bir hata
+diyaloğu açılması yalnızca 13.6** fark üretiyor.
+
+Yani "sabit" sanılan ekran, açılan bir diyalogdan daha çok değişiyor. Sebebi:
+ekranda video/animasyon olabiliyor ve yakalama (adına rağmen) tüm monitörü
+alıyor.
+
+**Sonuç: değişim kapısı tek başına yeterli değil.** Video oynarken hiç
+kapanmaz. Ölçülen diyalog farkları (%12 → 1.38, %20 → 5.0) eşiğin düşük
+seçilmesini gerektiriyor, bu da kapıyı daha da geçirgen yapıyor.
+
+Bu yüzden mimari üç katmanlı oldu ve **garantiyi veren katman tavan**:
+
+1. **Boşta** — kullanıcı masada değilse ekran yakalamaya bile gerek yok
+2. **Değişim** — ekran durgunsa sorma (okuma/yazma sırasında çok etkili)
+3. **Saatlik tavan** — 1 ve 2 hiç çalışmasa bile kotayı garantiler
+
+**Genel ders:** bir tasarruf mekanizmasının işe yarayacağını varsayma, en kötü
+durumda da tutan bir tavanla destekle. Kapı ortalama durumu iyileştirir, tavan
+felaketi engeller.
+
+## Türkçe güvenlik listesi diakritiksiz yazımı KAÇIRIR
+
+`auto_fix.DESTRUCTIVE_PATTERNS` yıkıcı eylemleri engelliyor: `satın al`,
+`gönder`, `devre dışı`, `kaldır`... Ama model hedefi **diakritiksiz** yazınca
+(`Satin Al`, `Gonder`, `devre disi`) alt dize eşleşmesi tutmuyordu ve kapı
+**sessizce açılıyordu** — bir güvenlik kapısının en kötü hâli.
+
+LLM'ler Türkçe karakterleri sık atlıyor; bazı arayüzler zaten ASCII yazıyor.
+2026-08-01'de testte yakalandı, üç kalıp birden etkileniyordu.
+
+**Kural:** Türkçe metinle çalışan her güvenlik/eşleşme karşılaştırması, iki
+tarafı da aynı biçime indirgemeli:
+
+```python
+_TR_ASCII = str.maketrans("ıİşŞğĞüÜöÖçÇâÂîÎûÛ", "iissgguuooccaaiiuu")
+def _normalize(t): return (t or "").translate(_TR_ASCII).casefold()
+```
+
+Liste de normalize edilmiş hâlde tutulmalı — karşılaştırma simetrik olmalı.
+
+Aynı hata eşanlam sözlüklerinde de vardı: `set_auto_fix("guvenli")`
+reddediliyordu çünkü anahtar `"güvenli"` yazılmıştı.
+
+## Bir güvenlik kapısı, denetlediği şeye güvenemez
+
+Otonom düzeltmede model her adıma kendi risk puanını veriyor (`low`/`medium`/
+`high`). Bu puana **tek başına** güvenmek, kilidin anahtarını hırsıza vermek
+olurdu — modelin yanlış tahmini tam da korunmak istediğimiz şey.
+
+Bu yüzden yerel yasak listesi Python'da ve modelden bağımsız duruyor; `all`
+modunda bile gevşemiyor.
+
+Bir kademe daha var: yasak listesi yalnızca **tarifi** görüyor, model "Sil"
+düğmesine *"kırmızı buton"* derse kaçırırdı. Çözüm iki fazlı uygulama —
+`intervene_screen(confirm=False)` önce hedefi BULUR ve bulduğunu geri verir,
+denetim **bulunan şeyin** tarifi üzerinde yapılır, ancak temizse tıklanır.
+Ayrıntı: [[Otonom-Duzeltme]].
+
+## Kaydırma konumunu içerik eklendikten SONRA ölçme
+
+`useEffect` yeni satır DOM'a girdikten sonra çalışıyor. Orada
+`scrollHeight - scrollTop - clientHeight` hesaplamak "kullanıcı dipte miydi"
+sorusunu **cevaplamıyor** — matematiksel olarak tam olarak yeni eklenen
+içeriğin yüksekliğini veriyor:
+
+```
+mesafe = (H + yeni) - (H - clientHeight) - clientHeight = yeni
+```
+
+Sonuç sinsi: kısa mesajlarda eşiği geçtiği için çalışıyor gibi görünüyor,
+uzun mesajlarda sessizce bozuluyor. Sohbette tam bu yaşandı (2026-08-01).
+
+**Kural:** "kullanıcı dipteydi mi" bilgisi `onScroll` olayında, yani içerik
+değişmeden ÖNCE bir ref'e yazılmalı; efekt o ref'e bakmalı.
+
 ## SwiftShader'da olaylar GECİKİYOR — 500 ms yetmez
 
 Headless Chromium + SwiftShader'da 3D sahne ana iş parçacığını doyuruyor;

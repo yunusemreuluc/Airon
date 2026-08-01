@@ -16,10 +16,13 @@ Not bir kaynağı özetliyorsa dosya:satır referansı verir — detay gerekirse
 - [[Tasarim-Kurallari]] — arayüz stili, animasyon, renk, bileşen adları (kod yorumlarındaki
   `CLAUDE.md § ...` atıfları buraya bakar)
 - [[Bilinen-Tuzaklar]] — zamana mal olmuş tuzaklar, arayüzde dürüstlük, nasıl doğrulanır
+- [[Yerel-Model]] — Ollama denendi ve **kaldırıldı**; ölçümler duruyor (num_ctx, Türkçe, VRAM)
 - `CLAUDE.md` — yalın karar kitabı: Obsidian-önce iş akışı, rol, performans hedefi
-- [[Kurulum-ve-Baslatma]] — arayüz: `desktop.py` (WebView2 penceresi), `frontend/` (Next.js + Three.js),
+- [[Kurulum-ve-Baslatma]] — kurulum ve çalıştırma: requirements.txt, AIRON.bat, make_shortcut.py,
+  bellek profili; ayrıca `desktop.py` (WebView2 penceresi), `frontend/` (Next.js + Three.js) ve
   `core/web_ui.py` (ses döngüsü ↔ arayüz adaptörü)
-- [[Kurulum-ve-Baslatma]] — requirements.txt, AIRON.bat, make_shortcut.py, ses teşhisi, bellek profili
+- [[Gelistirme-Ortami]] — Aıron'un kodu değil, onu geliştirirken kullanılan araçlar:
+  Claude Code alt-ajanları (agency-agents), kurulum kapsamı ve kebab-case `name` tuzağı
 
 ## Araçlar (actions/*.py — Gemini'nin çağırdığı fonksiyonlar)
 - [[Open-App]] — uygulama açma
@@ -36,7 +39,10 @@ Not bir kaynağı özetliyorsa dosya:satır referansı verir — detay gerekirse
 - [[Nesne-Tanima]] — kameradaki nesneler, YOLO-World (yerel) + öğretme
 - [[OCR]] — kameradaki yazıyı okuma, EasyOCR (yerel, Türkçe+İngilizce)
 - [[Izleme-ve-Brifing]] — proaktif izlemeler, günlük brifing, aktivite günlüğü
-- [[Dosya]] — doğal dille dosya arama ve içerik özetleme
+- [[Otonom-Duzeltme]] — gördüğü hatayı kendi düzeltmesi, üç güvenlik kapısı, off/safe/all
+- [[Ambient-Baglam]] — kullanıcı şu an ne yapıyor (pencere/program/boşta), kotasız
+- [[Dosya]] — doğal dille dosya arama ve içerik özetleme (salt okuma)
+- [[Dosya-Yonetimi]] — sıralı adlandırma, taşıma, silme (Geri Dönüşüm Kutusu'na)
 - [[Bildirimler-ve-Guc]] — Windows bildirimlerini okuma, kapat/yeniden başlat
 - [[Gemini-Masaustu]] — Chrome'da Gemini'ye prompt gönderme otomasyonu
 - [[Youtube-Stats]] — YouTube Data API kanal raporu

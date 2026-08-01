@@ -386,6 +386,80 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "manage_files",
+        "description": (
+            "Dosya ve klasör işlemleri yapar: sıralı adlandırma, yeniden adlandırma, "
+            "taşıma, kopyalama, silme. Kullanıcı 'şu klasördeki resimleri 1'den başlayarak "
+            "sırala', 'bu dosyanın adını değiştir', 'şunları şuraya taşı', 'bunları sil' "
+            "gibi bir şey isterse kullan.\n"
+            "- action='sequence': toplu sıralı adlandırma (1.jpg, 2.jpg...). Uzantı korunur. "
+            "ÖNCE confirm=false ile çağır — ne yapacağını listeler, kullanıcıya sesli aktarıp "
+            "onay al, sonra confirm=true ile tekrar çağır.\n"
+            "- action='delete': Geri Dönüşüm Kutusu'na gönderir. ONAY GEREKMEZ, geri alınabilir.\n"
+            "- action='delete_permanent': kalıcı siler. HER ZAMAN iki adımlı onay ister.\n"
+            "- action='move'/'copy': destination'a taşır/kopyalar. Aynı adlı dosya varsa "
+            "üzerine yazmaz, sonuna sayı ekler.\n"
+            "- action='rename': tek dosyanın adını değiştirir (destination = yeni ad).\n"
+            "Hedefin hangi klasör olduğunu bilmiyorsan önce search_files ile bul ya da "
+            "get_context/analyze_screen ile kullanıcının hangi klasörde olduğunu anla."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "sequence | rename | move | copy | delete | delete_permanent"
+                },
+                "target": {
+                    "type": "STRING",
+                    "description": "Dosya ya da klasörün tam yolu"
+                },
+                "destination": {
+                    "type": "STRING",
+                    "description": "move/copy için hedef klasör, rename için yeni ad"
+                },
+                "pattern": {
+                    "type": "STRING",
+                    "description": "Hangi dosyalar (ör. '*.jpg'). Boşsa klasördeki tüm dosyalar."
+                },
+                "sort_by": {
+                    "type": "STRING",
+                    "description": "sequence için sıralama ölçütü: name (varsayılan) | date | size"
+                },
+                "start": {
+                    "type": "NUMBER",
+                    "description": "sequence için başlangıç numarası (varsayılan 1)"
+                },
+                "confirm": {
+                    "type": "BOOLEAN",
+                    "description": "false = sadece ne yapacağını açıkla; true = gerçekten uygula"
+                }
+            },
+            "required": ["action", "target"]
+        }
+    },
+    {
+        "name": "set_auto_fix",
+        "description": (
+            "Aıron'un ekranda gördüğü hatayı KENDİ düzeltme politikasını değiştirir. "
+            "'off' = sadece haber ver, hiç dokunma. 'safe' = geri alınabilir tıklamaları "
+            "(Tamam, Yeniden Dene, kapat) kendi yap, riskli olanları sor. 'all' = sormadan "
+            "uygula. Kullanıcı 'kendin düzelt', 'bana sorma', 'otomatik düzeltmeyi kapat' "
+            "gibi bir şey derse kullan. Not: veri silen/para harcayan adımlar 'all' modunda "
+            "bile otomatik yapılmaz, kullanıcıya sorulur."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "mode": {
+                    "type": "STRING",
+                    "description": "off | safe | all"
+                }
+            },
+            "required": ["mode"]
+        }
+    },
+    {
         "name": "get_context",
         "description": (
             "Kullanıcının ŞU AN ne yaptığını söyler: hangi programda olduğu, aktif pencerenin "

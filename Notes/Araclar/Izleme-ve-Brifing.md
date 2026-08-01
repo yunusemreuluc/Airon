@@ -35,10 +35,53 @@ yüzden dosyadan değil, `backend/core/commands.read_provider("automation")`
 
 ## Otomatik bekçiler (araç değil, arka plan)
 
-- `_watch_screen_for_issues` — periyodik olarak aktif pencereyi kontrol eder
-  (`actions/screen_monitor.py`), sorun görürse haber verir
+- `_watch_screen_for_issues` — periyodik olarak ekranı kontrol eder
+  (`actions/screen_monitor.py`), sorun görürse haber verir ve politikaya göre
+  kendisi düzeltir ([[Otonom-Duzeltme]]). **Aıron'un en pahalı arka plan işi** —
+  aşağıdaki kota bütçesine bak.
 - `_watch_system_health` — pil/disk/CPU/RAM eşikleri
   (`actions/sys_info.check_health_thresholds`)
+
+## Kota bütçesi (2026-08-01)
+
+Ekran bekçisi 25 sn'de bir Gemini görü çağrısı atıyordu: **saatte 144, günde
+3456**. Gemini ücretsiz katmanı **günde 1500** veriyor — yani Aıron ~10 saat
+açık kalınca kota, kullanıcı hiçbir şey yapmadan biterdi
+([[Bilinen-Tuzaklar]] § Kotayı yakan şey araçlar değil).
+
+Üç katman eklendi (`main.py` → `SCREEN_WATCH_*` sabitleri):
+
+| Katman | Ne yapar | Nerede |
+|---|---|---|
+| **Boşta** | Kullanıcı 120 sn'dir klavyeye dokunmadıysa hiç bakma | `main.py` |
+| **Değişim** | Ekran öncekiyle aynıysa Gemini'ye sorma | `screen_monitor.screen_difference` |
+| **Tavan** | Saatte en fazla 20 gerçek çağrı | `main.py` |
+
+Aralık **25 → 90 sn**. Sıralama önemli: ucuz kontrol önce, ekran yakalama
+(yerel, ~30 ms) ortada, pahalı görü çağrısı en sonda.
+
+**Tavan neden şart:** değişim kapısının işe yarayacağı varsayılamaz. Ekranda
+video oynarken ardışık farklar ölçüldü ve hepsi eşiği aşıyordu — kapı hiç
+kapanmıyor. Tavan, kapı hiç çalışmasa bile kotayı garantiliyor.
+
+**"Atlandı" sayılmaz:** `check_for_issue` Gemini'ye gitmediğinde
+`skipped="unchanged"` döner ve bu çağrı tavana **işlenmez**. Aksi hâlde tavan
+tasarrufun kendisini cezalandırırdı.
+
+**Duraklatma sonrası referans unutulur** (`reset_change_tracking`): o aralıkta
+ekran değişmiş olabilir ama bakılmadı, dolayısıyla elde tutulan karşılaştırma
+noktası bayat.
+
+### Ölçülen sonuç (simülasyon, gerçek sabitlerle)
+
+| Senaryo | Eski | Yeni |
+|---|---|---|
+| 10 saat, ders/okuma (durgun ekran) | 1440 | **52** |
+| 10 saat, sürekli video | 1440 | 200 |
+| 24 saat, en kötü hâl | 3456 | **477** |
+
+En kötü durumda bile ücretsiz kotanın **%32'si**; geriye günde 1023 istek
+gerçekten kullandığın araçlara kalıyor. Tipik günde tüketim **%3**.
 
 ## Günlük brifing
 

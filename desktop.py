@@ -32,6 +32,8 @@ import threading
 import time
 from pathlib import Path
 
+from core.speaking_overlay import overlay as speaking_overlay
+
 # Chromium, kullanıcı sayfaya dokunmadan ses çalmayı engeller. Aıron'un ses
 # efektleri (açılış sesi gibi) kullanıcı etkileşiminden ÖNCE çalmak zorunda —
 # bu bir masaüstü uygulaması, gezinilen bir web sayfası değil. WebView2 ek
@@ -420,6 +422,11 @@ class TrayController:
             icon = self._icon
 
         self._window.hide()
+        # Pencere gizlendiği an Aıron'un konuştuğunu gösteren tek şey kalmıyor
+        # (3D sahnedeki çekirdek görünmüyor). Sağ üstteki ses dalgası yalnızca
+        # burada devreye giriyor — pencere açıkken gereksiz, çünkü çekirdek
+        # zaten konuşmayı gösteriyor. Bkz. core/speaking_overlay.py.
+        speaking_overlay.set_enabled(True)
         threading.Thread(target=icon.run, name="airon-tray", daemon=True).start()
 
     def _clear_icon(self) -> None:
@@ -430,10 +437,12 @@ class TrayController:
 
     def _restore(self, *_args) -> None:
         self._clear_icon()
+        speaking_overlay.set_enabled(False)
         self._window.show()
 
     def _quit(self, *_args) -> None:
         self._clear_icon()
+        speaking_overlay.shutdown()
         self._window.destroy()
 
 

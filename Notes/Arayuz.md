@@ -275,6 +275,90 @@ etiket 1.0; hover bitince imza 1.0.
 tarayıcı `leave(A)`/`enter(B)` sırasını garanti etmiyor, `leave` sonra gelirse
 imza B'nin üstündeyken geri parlardı. Yalnızca hâlâ kendisi yazılıysa temizliyor.
 
+## Sohbet kaydırma
+
+`ConversationLog.tsx`. Üç kural:
+
+1. **Açılışta** doğrudan en alta atlar (animasyonsuz — kayarak inmesi gereksiz
+   gösteri olurdu). `hasJumpedToLatest` ref'i ile, panel her açılışta yeniden
+   mount edildiği için sıfırlanıyor.
+2. **Kullanıcının kendi mesajı** her zaman alta çeker, yukarıda bir şey
+   okuyor olsa bile — mesajı gönderen onu görmek ister.
+3. **Diğer mesajlar** yalnızca kullanıcı zaten dipteyse kaydırır; yukarı
+   kaydırıp bir şey okuyorsa rahatsız etmez.
+
+### "Dipte miyim" ölçümü ÖNCEDEN yapılmalı
+
+Kullanıcı bildirdi (2026-08-01): *"msj atıyorum altta kalıyor."*
+
+Hata şuydu: alta olan mesafe `useEffect` içinde, yani **yeni satır DOM'a
+girdikten sonra** ölçülüyordu. O anda ölçülen şey "kullanıcı alta ne kadar
+yakındı" değil, tam olarak **yeni eklenen içeriğin yüksekliği**:
+
+```
+mesafe = (H + yeni) - (H - clientHeight) - clientHeight = yeni
+```
+
+Kısa bir satır (~40px) `< 80` eşiğini geçtiği için kaydırma çalışıyor, uzun
+bir cevap 80px'i aştığı için **çalışmıyordu**. Panel `max-h-56` (224px)
+olduğundan bu çok kolay oluyor — yani hata mesaj uzadıkça ortaya çıkıyordu.
+
+Çözüm: dipte olup olmama `onScroll` olayında, yani **içerik eklenmeden önce**
+ölçülüp `isPinnedToBottom` ref'inde tutuluyor. Efekt artık geçmişteki bu
+değere bakıyor, yeni içerikten etkilenen bir hesaba değil.
+
+Ölçüldü (224px panel, ~420 karakterlik cevap): dipteyken uzun mesaj görünür,
+yukarı kaydırılmışken kendi mesajı alta çekiyor, başkasının mesajı `scrollTop`
+0'da bırakıyor.
+
+## Tepsi konuşma göstergesi
+
+`core/speaking_overlay.py`. Aıron tepsiye alındığında pencere görünmüyor, yani
+konuştuğunu anlamanın hiçbir görsel yolu kalmıyordu. Artık sağ üstte küçük bir
+ses dalgası çıkıyor, susunca kapanıyor.
+
+**Yalnızca tepsideyken.** Pencere açıkken gereksiz — çekirdek zaten konuşurken
+turkuaza dönüyor ([[Arayuz]] § Beş tepki). İki gösterge aynı anda aynı şeyi
+söylerse biri gürültü olur.
+
+**Dalga GERÇEK sesten besleniyor.** Süsleme amaçlı bir döngü değil: çubuklar
+`_play_audio` içindeki PCM parçasının genliğinden geliyor (`_mic_level` ile,
+mikrofonla aynı hesap — çıktı da 16-bit mono). Aıron susunca düzleşiyor,
+yüksek sesle konuşurken yükseliyor. Sahte bir animasyon, bağlantı koptuğunda
+da neşeyle oynamaya devam ederdi ([[Bilinen-Tuzaklar]] § Arayüzde dürüstlük).
+
+Görüntü kaydırmalı: en yeni değer sağda, geçmiş sola akıyor — sabit bir
+ekolayzer değil, "az önce ne söyledi"nin izi.
+
+### Tkinter neden geri geldi
+
+Tkinter arayüzü 2026-07-29'da **bilerek silinmişti** ([[Home]] § Kaldırılan):
+Canvas gerçek blur/bloom üretemediği için orb'u yaklaşık çiziyordu ve CPU'yu
+tek çekirdekte ~%100 yakıyordu.
+
+Buradaki iş o değil. 14 dikdörtgenin yüksekliğini saniyede 25 kez güncellemek
+Canvas'ın zorlanmadan yaptığı bir şey. Karar "Tkinter kötüdür" değildi,
+"shader kalitesinde bir sahneyi Canvas ile taklit etmek kötüdür"di.
+
+**Elenen alternatif:** ikinci bir pywebview penceresi. HUD'la görsel olarak
+tutarlı olurdu ama küçücük bir gösterge için ayrı bir WebView2 örneği
+(~50-150 MB) açmak gerekiyordu; bellek profili zaten ~1.25 GB
+([[Kurulum-ve-Baslatma]]).
+
+`tkinter` **tembel import**: modül açılışta değil, gösterge ilk kez
+etkinleştiğinde yükleniyor — Aıron tepsiye hiç alınmazsa hiç yüklenmiyor
+([[Bilinen-Tuzaklar]] § Ağır Python import'ları tembel olmalı).
+
+### İş parçacığı kuralı
+
+Tk kendi thread'inde yaşıyor ve Tk nesnelerine **sadece o thread** dokunuyor.
+Dışarıdan gelen `set_speaking`/`push_level` kilitli bir duruma yazıyor, Tk
+döngüsü onu `after()` ile okuyor. Widget'lara başka thread'den dokunmak
+Windows'ta sessiz donmalara yol açıyor.
+
+Ölçüldü: tepside değilken görünmüyor, tepsideyken sessizken görünmüyor,
+konuşurken çıkıyor, bitince kapanıyor.
+
 ## Ambient bağlam satırı
 
 `BrandBadge`'in üçüncü satırı: **AIRON → durum → kullanıcının ne yaptığı.**

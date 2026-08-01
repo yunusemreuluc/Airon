@@ -43,6 +43,82 @@ MONITOR_MODELS = (
 )
 MONITOR_MAX_DIMENSION = 1200  # sadece "sorun var mı" tespiti — analyze_screen'den küçük
 
+# ── Değişim kapısı (2026-08-01) ─────────────────────────────────────────────
+# Bekçi 25 sn'de bir Gemini'ye görü çağrısı atıyordu: saatte 144, günde 3456.
+# Gemini ÜCRETSİZ katmanı günde 1500 istek veriyor — yani Aıron ~10 saat açık
+# kalınca kota, kullanıcı tek kelime etmeden bitiyordu. Kasadaki "test ederken
+# kota dolmuştu" notlarının (gemini_desktop_task, search_files, activity_log)
+# gerçek sebebi test edilen araç değil, arka planda dönen bu bekçiydi.
+#
+# Çözümün özü: EKRAN DEĞİŞMEDİYSE SORMA. Aynı piksellere ikinci kez bakmanın
+# bilgi değeri sıfır; kullanıcı bir belgeyi 10 dakika okurken 24 çağrı boşa
+# gidiyordu.
+#
+# Karşılaştırma TAM EŞLEŞME DEĞİL: gerçek ekranlarda saat saniyesi, imleç
+# yanıp sönmesi, ufak animasyonlar sürekli birkaç piksel oynatıyor. Tam karma
+# kullanılsaydı kapı hiç kapanmaz, hiçbir tasarruf olmazdı. Bunun yerine
+# görüntü küçük bir gri tonlamalı küçük resme indirgenip ORTALAMA MUTLAK FARK
+# ölçülüyor — saat rakamı toplamda gürültü kalır, açılan bir hata diyaloğu
+# eşiği rahatça geçer.
+_DIFF_SIZE = (96, 96)
+
+# ÖLÇÜM VARSAYIMI ÇÜRÜTTÜ (2026-08-01). "Ekran sabitken fark küçüktür"
+# sanılıyordu; gerçek masaüstünde ardışık farklar 4.5 / 22 / 55 / 71 ölçüldü —
+# %30'luk bir hata diyaloğunun açılmasından (13.6) bile büyük. Sebep: ekranda
+# video/animasyon olabiliyor ve yakalama tüm monitörü alıyor.
+#
+# Sonuç: karma kapısı TEK BAŞINA yeterli DEĞİL. Video oynarken hiç kapanmaz.
+# Bu yüzden mimari üç katmanlı:
+#   1. Boşta kapısı  — kullanıcı masada değilse hiç bakma (en büyük tasarruf)
+#   2. Değişim kapısı — ekran duruyorsa sorma (okuma/yazma sırasında etkili)
+#   3. Saatlik tavan  — 1 ve 2 işe yaramasa bile kotayı GARANTİ eder (main.py)
+#
+# Eşik ölçülen diyalog farklarına göre seçildi: %12'lik bir diyalog 1.38,
+# %20'lik 5.0 fark üretiyor. 1.0 küçük diyalogları bile yakalar. Yakalayamadığı
+# %6'lık bildirimler (0.18) zaten "kullanıcının fark etmesi gereken açık bir
+# durum" tanımına girmiyor.
+DEFAULT_CHANGE_THRESHOLD = 1.0
+_previous_signature: list[int] | None = None
+
+
+def _signature(image_path: Path) -> list[int] | None:
+    """Görüntünün küçük gri tonlamalı imzası — karşılaştırma için."""
+    if not HAS_PIL:
+        return None
+    try:
+        with Image.open(image_path) as img:
+            small = img.convert("L").resize(_DIFF_SIZE, Image.Resampling.BILINEAR)
+            return list(small.getdata())
+    except Exception:
+        return None
+
+
+def screen_difference(image_path: Path) -> float | None:
+    """Bir öncekine göre ortalama mutlak fark (0-255). İlk çağrıda None.
+
+    Yan etkili: her çağrıda referansı günceller. Referansın DEĞİŞMEDİĞİNDE de
+    güncellenmesi kasıtlı — böylece yavaş kayma (ör. kademeli soluklaşan bir
+    animasyon) sonsuza kadar birikip sahte bir "değişti" üretmiyor.
+    """
+    global _previous_signature
+    imza = _signature(image_path)
+    if imza is None:
+        return None
+    onceki, _previous_signature = _previous_signature, imza
+    if onceki is None or len(onceki) != len(imza):
+        return None
+    return sum(abs(a - b) for a, b in zip(imza, onceki)) / len(imza)
+
+
+def reset_change_tracking() -> None:
+    """Referansı unut — bir sonraki kontrol kesin çalışsın.
+
+    Duraklatma/susturma sonrası kullanılıyor: o aralıkta ekran değişmiş
+    olabilir ama biz bakmadık, dolayısıyla elimizdeki referans bayat.
+    """
+    global _previous_signature
+    _previous_signature = None
+
 
 def get_active_window_title() -> str:
     try:
@@ -114,16 +190,36 @@ def _check_prompt(window_title: str) -> str:
     )
 
 
-def check_for_issue(api_key: str, window_title: str) -> dict:
-    """{"issue_found": bool, "description": str} döner. Teknik bir sorun olursa
-    (API/anahtar/yakalama hatası) sessizce issue_found=False ile geçer — bu
-    fonksiyon kullanıcıyla ASLA doğrudan konuşmaz, main.py'ye sinyal verir."""
+def check_for_issue(
+    api_key: str,
+    window_title: str,
+    change_threshold: float = DEFAULT_CHANGE_THRESHOLD,
+) -> dict:
+    """{"issue_found": bool, "description": str, "skipped": str} döner.
+
+    Teknik bir sorun olursa (API/anahtar/yakalama hatası) sessizce
+    issue_found=False ile geçer — bu fonksiyon kullanıcıyla ASLA doğrudan
+    konuşmaz, main.py'ye sinyal verir.
+
+    `skipped` alanı Gemini'ye HİÇ gidilmediğini söyler ("unchanged"). Bu bir
+    hata değil, tasarruf; çağıran taraf bunu kota günlüğü için okuyabilir.
+    Ekran yakalama yerel ve ucuz (~30 ms), pahalı olan görü çağrısı — o yüzden
+    kapı yakalamadan SONRA, çağrıdan ÖNCE.
+    """
     if not api_key:
-        return {"issue_found": False, "description": ""}
+        return {"issue_found": False, "description": "", "skipped": "no_key"}
 
     image_path = _capture_active_window()
     if image_path is None:
-        return {"issue_found": False, "description": ""}
+        return {"issue_found": False, "description": "", "skipped": "capture_failed"}
+
+    fark = screen_difference(image_path)
+    if fark is not None and fark < change_threshold:
+        try:
+            image_path.unlink()
+        except Exception:
+            pass
+        return {"issue_found": False, "description": "", "skipped": "unchanged"}
 
     try:
         image_part = types.Part.from_bytes(data=image_path.read_bytes(), mime_type="image/png")
@@ -138,15 +234,18 @@ def check_for_issue(api_key: str, window_title: str) -> dict:
                 )
                 parsed = _extract_json(str(getattr(response, "text", "") or ""))
                 if parsed is not None:
+                    # skipped="" — Gemini GERÇEKTEN çağrıldı. Kota günlüğünde
+                    # "baktım, bir şey yok" ile "hiç bakmadım" ayrılabilsin.
                     return {
                         "issue_found": bool(parsed.get("issue_found")),
                         "description": str(parsed.get("description") or "").strip(),
+                        "skipped": "",
                     }
             except Exception:
                 continue
-        return {"issue_found": False, "description": ""}
+        return {"issue_found": False, "description": "", "skipped": ""}
     except Exception:
-        return {"issue_found": False, "description": ""}
+        return {"issue_found": False, "description": "", "skipped": ""}
     finally:
         try:
             image_path.unlink()

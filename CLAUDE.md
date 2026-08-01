@@ -28,13 +28,16 @@ Read before touching an unfamiliar area.
 
 ## After finishing any work
 
-Update the vault in the same turn.
+Update the vault in the same turn - write the notes directly.
 
-End the reply with a section titled "Obsidian Güncellemesi".
+Do NOT report the vault changes back in the reply.
+The user asked for this explicitly (2026-08-01): no
+"Obsidian Güncellemesi" section, no summary of which note changed.
+Just do it silently.
 
-State which note changed and what changed.
-
-If a note was not written directly, give paste-ready Markdown.
+Mention a vault edit only when the user needs to act on it -
+a decision you could not make for them, or a change to a
+file they curate by hand.
 
 A completed roadmap item is REMOVED from the roadmap
 and DOCUMENTED in `Notes/`.

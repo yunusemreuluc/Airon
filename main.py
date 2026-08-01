@@ -19,6 +19,7 @@ import threading
 import os
 import time
 import re
+from collections import deque
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -53,13 +54,21 @@ from actions.weather   import get_weather_summary  # noqa: F401
 from actions.ocr import HAS_EASYOCR, lines_to_text, read_text_in_jpeg
 from actions.screen_vision import analyze_screen  # noqa: F401
 from actions.screen_control import intervene_screen  # noqa: F401
-from actions.screen_monitor import check_for_issue, get_active_window_title
+from actions.screen_monitor import (
+    check_for_issue,
+    get_active_window_title,
+    reset_change_tracking,
+)
 from actions.ambient_context import describe_context, get_context  # noqa: F401 — @register_tool yan etkisi için
+from actions.ambient_context import _idle_seconds
+from actions.auto_fix import apply_plan, get_auto_fix_mode, plan_fix, set_auto_fix  # noqa: F401
+from core.speaking_overlay import overlay as speaking_overlay
 from actions.object_recognition import detect_objects_in_jpeg, describe_object_for_learning
 from actions.sys_info import check_health_thresholds
 from actions.screen_watch import check_watch_condition
 from actions.notifications import get_recent_notifications  # noqa: F401 — @register_tool yan etkisi için
 from actions.file_search import search_files, summarize_file  # noqa: F401 — @register_tool yan etkisi için
+from actions.file_manager import manage_files  # noqa: F401 — @register_tool yan etkisi için
 from actions.power_control import execute_power_action
 from actions.gemini_automation import gemini_desktop_task  # noqa: F401 — @register_tool yan etkisi için
 from actions.video_analysis import analyze_video  # noqa: F401
@@ -72,6 +81,33 @@ if TYPE_CHECKING:  # yalnızca tip denetimi için — çalışma zamanında impo
 
 setup_logging()
 logger = logging.getLogger("airon")
+
+# Otomatik düzeltme, kullanıcı klavyeye dokunmayı bırakalı bu kadar geçmeden
+# ekrana tıklamaz — yazmanın ortasında odak çalmak, düzelttiği sorundan daha
+# rahatsız edici olurdu. Hata diyaloğu kullanıcıyı zaten durdurduğu için
+# pratikte gecikme yaratmıyor (bkz. actions/auto_fix.py).
+AUTO_FIX_MIN_IDLE_S = 2.0
+
+# ── Ekran bekçisinin kota bütçesi (2026-08-01) ──────────────────────────────
+# Bekçi 25 sn'de bir Gemini görü çağrısı atıyordu: saatte 144, günde 3456.
+# Gemini ÜCRETSİZ katmanı günde 1500 istek veriyor — Aıron ~10 saat açık
+# kalınca kota, kullanıcı tek kelime etmeden bitiyordu. Kasadaki üç ayrı
+# "test ederken kota dolmuştu" notunun gerçek sebebi buydu.
+#
+# Üç katman var ve SIRALAMA ÖNEMLİ — ucuz olan önce:
+#   1. Boşta   : kullanıcı yoksa ekran yakalamaya bile gerek yok
+#   2. Değişim : ekran durduysa Gemini'ye sorma (screen_monitor'daki kapı)
+#   3. Tavan   : 1 ve 2 işe yaramasa bile (video oynuyorsa değişim kapısı hiç
+#                kapanmıyor — ölçüldü) kotayı GARANTİ eder
+#
+# 90 sn + saatte 20 tavan → en kötü ihtimalle günde 480 çağrı, ücretsiz
+# katmanın üçte biri. Geri kalanı senin gerçekten kullandığın araçlara kalıyor.
+SCREEN_WATCH_INTERVAL_S = 90.0
+SCREEN_WATCH_MAX_CALLS_PER_HOUR = 20
+# Bu kadar süredir klavye/fareye dokunulmadıysa ekranda hata aramanın anlamı
+# yok — kimse görmüyor. Döndüğünde ekran zaten değişmiş olacağı için değişim
+# kapısı da açılır ve kontrol kendiliğinden yapılır.
+SCREEN_WATCH_MAX_IDLE_S = 120.0
 
 # ── Paths ───────────────────────────────────────────────────────────────────
 BASE_DIR        = Path(__file__).resolve().parent
@@ -925,25 +961,61 @@ class AironLive:
         """Proaktif ekran izleme (YAPILACAKLAR.md #4). Periyodik olarak aktif pencereyi
         tarar; kullanıcının dikkatini gerektiren açık bir durum (hata/uyarı penceresi vb.)
         görürse kendiliğinden sesli haber verir. Aynı sorunu tekrar tekrar bildirmemek
-        için basit bir imza+cooldown mekanizması var (bkz. _last_issue_signature)."""
-        POLL_INTERVAL_SECONDS = 25.0
+        için basit bir imza+cooldown mekanizması var (bkz. _last_issue_signature).
+
+        KOTA: bu bekçi Aıron'un en pahalı arka plan işi — her kontrol bir Gemini
+        görü çağrısı. Üç katmanlı bütçe için modül başındaki SCREEN_WATCH_*
+        sabitlerine bak."""
         RENOTIFY_COOLDOWN_SECONDS = 180.0
         loop = asyncio.get_event_loop()
+        # Son bir saatteki gerçek Gemini çağrılarının zaman damgaları.
+        cagri_zamanlari: deque[float] = deque()
+        atlanan = 0  # arka arkaya kaç kontrol atlandı (günlüğü boğmamak için)
 
         while True:
-            await asyncio.sleep(POLL_INTERVAL_SECONDS)
+            await asyncio.sleep(SCREEN_WATCH_INTERVAL_S)
 
             if not self._proactive_checks_allowed(block_on_webcam=True):
+                # Duraklatma/susturma sırasında ekran değişmiş olabilir ama biz
+                # bakmadık; elimizdeki referans bayat. Unutalım ki dönüşte ilk
+                # kontrol kesin çalışsın.
+                reset_change_tracking()
+                continue
+
+            # ── Katman 1: kullanıcı masada mı ──
+            if _idle_seconds() >= SCREEN_WATCH_MAX_IDLE_S:
+                reset_change_tracking()
+                continue
+
+            # ── Katman 3: saatlik tavan ──
+            simdi = time.monotonic()
+            while cagri_zamanlari and simdi - cagri_zamanlari[0] > 3600:
+                cagri_zamanlari.popleft()
+            if len(cagri_zamanlari) >= SCREEN_WATCH_MAX_CALLS_PER_HOUR:
+                atlanan += 1
+                if atlanan == 1:
+                    logger.info(
+                        "[AIRON] Ekran bekçisi saatlik kota tavanına ulaştı "
+                        f"({SCREEN_WATCH_MAX_CALLS_PER_HOUR}/saat), bekliyor"
+                    )
                 continue
 
             api_key = get_api_key()
             window_title = get_active_window_title()
             try:
+                # ── Katman 2: değişim kapısı check_for_issue'nun İÇİNDE ──
                 result = await loop.run_in_executor(
                     None, lambda: check_for_issue(api_key, window_title))
             except Exception:
                 logger.exception("[AIRON] Proaktif ekran taraması başarısız")
                 continue
+
+            # Gemini'ye gerçekten gidildiyse tavana say. "unchanged" ile dönen
+            # kontrol yerel kaldı, kota harcamadı — saymamak şart, yoksa tavan
+            # tasarrufun kendisini cezalandırırdı.
+            if not result.get("skipped"):
+                cagri_zamanlari.append(simdi)
+                atlanan = 0
 
             if not result.get("issue_found"):
                 continue
@@ -961,18 +1033,99 @@ class AironLive:
             self._last_issue_notified_at = now
             logger.info(f"[AIRON] 👁️ Proaktif ekran uyarısı: {signature}")
 
+            await self._handle_detected_issue(description, window_title, api_key, loop)
+
+    async def _handle_detected_issue(
+        self, description: str, window_title: str, api_key: str, loop
+    ) -> None:
+        """Tespit edilen sorunu teşhis eder ve politikaya göre KENDİ düzeltir.
+
+        Kullanıcı isteği (2026-08-01): "hata buluyorsa çözümü de bulsun ve kendi
+        yapsın." Öncesinde Aıron yalnızca haber verip tavsiye ediyordu; ekranda
+        bir şey yapması için kullanıcının "düzelt" demesi ve sonra bir de onay
+        vermesi gerekiyordu.
+
+        Politika `auto_fix_mode` (off/safe/all) — güvenlik kapıları ve neden üç
+        tane oldukları actions/auto_fix.py başında.
+        """
+        mode = get_auto_fix_mode()
+        pencere = window_title or "bilinmiyor"
+
+        if mode == "off":
             await self._send_proactive_system_message(
                 "[SİSTEM — proaktif ekran izleyicisi, kullanıcı bunu sormadı] "
                 f"Arka planda ekranı izlerken şu sorunu fark ettin: {description} "
-                f"(pencere: {window_title or 'bilinmiyor'}). Kullanıcıya kısaca, "
-                "doğal bir şekilde haber ver — VE bu hataya dair bildiğin/tahmin "
-                "ettiğin somut bir çözüm veya ilk adım öner (ör. 'X'i yeniden "
-                "başlat', 'Y ayarını kontrol et', 'internet bağlantını kontrol et'). "
-                "Daha detaylı bakman gerekirse analyze_screen aracını kullanabilirsin. "
-                "Kullanıcı 'düzelt' derse ve düzeltme ekranda bir eylem gerektiriyorsa "
-                "normal kuralına göre (önce confirm=false ile açıkla, onay iste) "
-                "intervene_screen kullan — kendiliğinden tıklama/yazma yapma."
+                f"(pencere: {pencere}). Kullanıcıya kısaca, doğal bir şekilde haber "
+                "ver — VE somut bir çözüm veya ilk adım öner. Kullanıcı 'düzelt' "
+                "derse intervene_screen'i normal kuralına göre (önce confirm=false, "
+                "onay iste) kullan. Otomatik düzeltme KAPALI, kendiliğinden tıklama."
             )
+            return
+
+        # Kullanıcı klavyede aktifken tıklamak, yazdığı şeyin ortasında odağı
+        # çalmak demek. Hata diyaloğu zaten onu durdurmuş olacağı için kısa bir
+        # sessizlik beklemek pratikte gecikme yaratmıyor.
+        if _idle_seconds() < AUTO_FIX_MIN_IDLE_S:
+            logger.info("[AIRON] Otomatik düzeltme ertelendi — kullanıcı yazıyor")
+            return
+
+        plan = await loop.run_in_executor(
+            None, lambda: plan_fix(api_key, description, pencere)
+        )
+
+        if not plan.get("can_fix_on_screen"):
+            tavsiye = plan.get("user_advice") or ""
+            await self._send_proactive_system_message(
+                "[SİSTEM — proaktif ekran izleyicisi, kullanıcı bunu sormadı] "
+                f"Şu sorunu fark ettin: {description} (pencere: {pencere}). "
+                f"Teşhisin: {plan.get('diagnosis') or 'net değil'}. Bu ekranda "
+                "tıklayarak çözülemiyor. Kullanıcıya kısaca haber ver ve şu somut "
+                f"tavsiyeyi kendi cümlelerinle aktar: {tavsiye or 'uygun bir ilk adım öner'}."
+            )
+            return
+
+        self.ui.task_started("auto_fix", {"sorun": description[:60]})
+        sonuc = await loop.run_in_executor(None, lambda: apply_plan(plan, mode))
+        yapilan = sonuc.get("applied", [])
+        engellenen = sonuc.get("blocked", [])
+        basarisiz = sonuc.get("failed", [])
+        self.ui.task_finished(
+            "auto_fix",
+            bool(yapilan) and not basarisiz,
+            f"{len(yapilan)} adım uygulandı, {len(engellenen)} engellendi",
+        )
+
+        parcalar = [
+            "[SİSTEM — proaktif ekran izleyicisi, kullanıcı bunu sormadı] "
+            f"Şu sorunu fark ettin: {description} (pencere: {pencere}). "
+            f"Teşhisin: {plan.get('diagnosis') or 'net değil'}."
+        ]
+        if yapilan:
+            adimlar = ", ".join(a["target"] for a in yapilan)
+            parcalar.append(
+                f"Kullanıcıya SORMADAN şunları kendin yaptın: {adimlar}. "
+                "Bunu ona bildir — izin istemiş gibi değil, YAPILMIŞ bir şeyi "
+                "haber verir gibi söyle ve sorunun düzelip düzelmediğini sor."
+            )
+        if engellenen:
+            ilk = engellenen[0]
+            parcalar.append(
+                f"Şu adımı GÜVENLİK GEREĞİ yapmadın: '{ilk['target']}' "
+                f"({ilk['reason']}). Bunu kullanıcıya açıkla ve yapmamı ister "
+                "misin diye sor; onaylarsa intervene_screen ile uygula."
+            )
+        if basarisiz:
+            parcalar.append(
+                f"Şu adım denendi ama başarısız oldu: {basarisiz[0].get('target')} "
+                f"({basarisiz[0].get('error')}). Uydurma, dürüstçe söyle."
+            )
+        if not (yapilan or engellenen or basarisiz):
+            parcalar.append(
+                "Plan çıkardın ama hiçbir adım uygulanamadı. Kullanıcıya sorunu "
+                "bildir ve teşhisini aktar."
+            )
+
+        await self._send_proactive_system_message(" ".join(parcalar))
 
     async def _watch_system_health(self):
         """Sistem sağlığı bekçisi (YAPILACAKLAR.md #6). Periyodik olarak pil/disk/
@@ -1347,8 +1500,15 @@ class AironLive:
                 if chunk is None:
                     # turn_complete sentinel — tum ses calindi, dinlemeye gec
                     self.set_speaking(False)
+                    speaking_overlay.set_speaking(False)
                     continue
                 self.set_speaking(True)
+                # Tepsi göstergesi GERÇEK sesten besleniyor (bkz.
+                # core/speaking_overlay.py). Aynı parçadan hesaplanıyor, ekstra
+                # bir okuma yok; `_mic_level` mikrofonla aynı 16-bit mono PCM
+                # biçimini bekliyor ve çıktı da o biçimde.
+                speaking_overlay.set_speaking(True)
+                speaking_overlay.push_level(self._mic_level(chunk))
                 await asyncio.to_thread(stream.write, chunk)
         except Exception as e:
             logger.exception("[AIRON] Ses calma hatasi")
