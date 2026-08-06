@@ -36,6 +36,21 @@ olaylar `backend/models/events.py` içindeki `EventType` listesinde tanımlı.
 > **sessizce düşer**: `WebUI._emit` Pydantic doğrulama hatasını yutuyor.
 > 2026-07-30'da `vision_detections` tam olarak böyle kaybolmuştu.
 
+Soket **olayları** taşıyor; **istekler** (komut gönderme, ayar yazma, telemetri
+okuma) HTTP ile gidiyor ve hepsi tek bir yerden geçiyor: `services/apiClient.ts`.
+Orada üç şey var — taban adres (`apiBase()`: masaüstünde boş string, `npm run
+dev`'de `localhost:8000`), backend'in `{success, message, data}` zarfı ve
+backend kapalıyken arayüzü çökertmeyen sarmalayıcılar (`request` / `post` /
+`fetchData`).
+
+`fetchData` başarısızlıkta `null` döner — çağıran taraf "veri yok" ile "backend
+yok" arasında ayrım yapmadığı için ikisi de aynı sonuca çıkıyor: gösterilecek
+bir şey yok, uydurma da yok (bkz. [[Bilinen-Tuzaklar]] § Arayüzde dürüstlük).
+
+Bu dosya 2026-08-06'da açıldı: aynı üç şey beş servis dosyasında ayrı ayrı
+yazılıydı ve `apiBase` gereksiz yere `voiceApi.ts` içinde oturuyordu — görü,
+ayarlar ve ses efektleri onu sesli asistan modülünden import ediyordu.
+
 ## Açılış sahnelemesi — "Ateşleme"
 
 Kullanıcı isteğiyle (2026-07-31) yeniden tasarlandı. Önceki sürüm siyah ekranda
@@ -200,6 +215,54 @@ renk kavgası değil, aynı ailenin içinde bir kayma gibi okunuyor.
 Palet **tek kaynak**: çekirdek, korona ve elektrik arkları hepsi oradan
 besleniyor — ayrı yazılsalardı biri geride kalır ve yeşil çekirdeğin etrafında
 mavi bir korona dönerdi.
+
+**Arklar 2026-08-06'ya kadar bu kuralın yarısını çiğniyordu:** `ElectricArcs`
+paletin kenar rengine YALNIZCA `speaking` (ve uykuda) çekiliyordu, karışım diğer
+durumlarda 0'dı. Yani kehribar `automation` ve mor `memory` çekirdeklerin
+etrafında arklar buz mavisi kalıyordu — kuralın önlemek için yazıldığı hatanın
+ta kendisi. Görünmüyordu çünkü dolu plazma küre arkların yarısını örtüyordu;
+çekirdek tel kafese dönüp arklar cismin içinden geçer olunca uyumsuzluk ekranda
+apaçık ortaya çıktı. Karışım artık her durumda uygulanıyor (`CORE_COLOR_BLEND`).
+
+## Tel kafes çekirdek
+
+Çekirdek 2026-08-06'da (kullanıcı isteği) **dolu plazma küreden tel kafes
+hologramına** geçti. Değişen geometri ve ışık modeli; davranış sözleşmesinin
+tamamı — nefes, beş tepki, uyku, açılış zamanlaması, fare tepkisi, tıklayınca
+uyuma — korundu.
+
+Üç katman, dışarıdan içeri opaklık artıyor:
+
+| Katman | Yarıçap / detay | Üçgen | Rol |
+|---|---|---|---|
+| Dış kafes | 1.62 / 1 | 80 | cismin sınırı — görünür ama bakılan şey değil |
+| Orta kafes | 1.24 / 2 | 320 | dalgalanmayı (`uDistortion`) taşıyan katman |
+| Çekirdek | 0.58 / 3 | 1280 | küçük ve yoğun: "içeride bir şey var" |
+
+Katmanlar ters yönlerde ve farklı hızlarda dönüyor, eksenleri eğik — hepsi aynı
+eksende dönseydi kesişim çizgileri sabit kalır ve moiré üretirdi.
+
+**Detay seviyesi dolu küredekinin TERSİ mantıkla seçiliyor.** Dolu küre
+detail=5 kullanıyordu (20480 üçgen) çünkü orada üçgenler görünmüyordu, yalnızca
+yüzey pürüzsüzleşiyordu. Kafeste her üçgen çiziliyor. Toplam üçgen sayısı bu
+yüzden 20480'den **1680'e düştü** (3 çizim çağrısı, 1 yerine).
+
+### Ekrana bakarak düzeltilen üç şey
+
+Tip kontrolü hiçbirini yakalamazdı (bkz. [[Bilinen-Tuzaklar]] § Bakarak doğrula):
+
+1. **Kafes beyaza yıkanıyordu.** Fresnel kenar payı dolu küreden devralınmıştı
+   (0.75). Dolu kürede o pay yalnızca ince bir silüet şeridini boyuyor; kafeste
+   çizgilerin çoğu eğik olduğu için TÜM orb platin beyaz oldu ve buz mavisi /
+   kehribar / mor ayrımı kayboldu. 0.45'e indirildi.
+2. **Spiral spiral değildi.** İlk tasarımda üçüncü katman küreye sarılan tek bir
+   çizgiydi (13 sarım). Önden bakınca spiral değil **yatay çizgi yığını** gibi
+   okunuyordu — bir bobin, akan enerji değil. Yerine küçük ve sık bir kafes küre
+   kondu.
+3. **Arklar renk uyumunu bozuyordu** — yukarıdaki § Durum renkleri.
+
+Ölçüm düzeneği: statik export'u 8000'den sunan sahte backend + gerçek WebSocket,
+durumlar `/emit` ile test sürecinden tetiklendi, her durum için ekran görüntüsü.
 
 ### Beş tepki
 
@@ -437,6 +500,12 @@ daha kesin söylenemez.
 - **Tepsiye al** — ayarlar panelinden çıkarıldı, sağ üstte sabit kontrol.
 - **İkon** — `make_icon.py` prosedürel üretiyor; 16px ve 256px için **ayrı
   çizim** (tek görseli küçültmek 16px'te lapa üretiyordu).
+- **Duraklat** — arayüzde **düğmesi yok**. Zincirin geri kalanı tam: uç
+  (`POST /api/voice/pause`), köprü (`web_ui.on_pause_toggle`), çekirdek
+  (`main.py` `_paused` — mikrofonu ve araç çağrılarını durduruyor), hatta
+  durumun soketten dönüşü (`assistant_status`). Yalnızca kullanıcının
+  basacağı şey eksik; `services/voiceApi.ts` içindeki `setPaused` bu yüzden
+  hiçbir yerden çağrılmıyor. Sessize alma (mute) düğmesi `AssistantDock`'ta.
 
 ## Doğrulama notu
 

@@ -12,6 +12,15 @@ Görüntü işleme ile eli algılayıp, el hareketleriyle masaüstündeki dosyal
 açma/kapama gibi işlemler yapabilme ("ve daha fazlası" — genişleyebilir).
 **Şimdilik ertelendi** — sırada değil, ileride dönülecek.
 
+**Referans (2026-08-06):** `SAGAR-TAMANG/ultron-by-sagar-builds` (MIT) aynı
+işi tarayıcıda **MediaPipe Hands** ile yapıyor — `lib/handTracker.ts`, kıstırma
+(pinch) hareketiyle 3D orb'u döndürüyor/yakınlaştırıyor. O depoda YALNIZCA
+arayüz var (Next.js + Three.js); ses ve cihaz kontrolü tarafı açık değil.
+Bizim için değerli olan kısım el algılamanın yeri: tarayıcıda, zaten açık olan
+kamera akışı üzerinde, Python'a hiç uğramadan. Asıl iş bundan sonrası —
+hareketi masaüstü eylemine çevirecek köprü (WebSocket → araç çağrısı), ki o
+depoda karşılığı yok.
+
 ## 5. Proaktif takvim/hatırlatıcı bildirimi
 **Şimdilik ertelendi** (2026-07-26) — gerçek engel bulundu: Windows'taki
 `get_calendar_events`/`get_reminders` gerçek veri OKUMUYOR, sadece tarayıcıda

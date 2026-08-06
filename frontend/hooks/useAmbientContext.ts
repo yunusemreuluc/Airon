@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiBase } from '@/services/voiceApi';
+import { fetchData } from '@/services/apiClient';
 
 // Ambient bağlam — Aıron'un "kullanıcı şu an ne yapıyor" farkındalığı.
 //
@@ -34,35 +34,25 @@ export function useAmbientContext(): AmbientContext | null {
     let cancelled = false;
 
     const load = async () => {
-      try {
-        const response = await fetch(`${apiBase()}/api/system/context`);
-        const result = (await response.json()) as {
-          success?: boolean;
-          data?: Record<string, unknown>;
-        };
-        if (cancelled || !result.success || !result.data) return;
+      const data = await fetchData<Record<string, unknown>>('/api/system/context');
+      if (cancelled) return;
 
-        const data = result.data;
-        const app = typeof data.app === 'string' ? data.app : '';
-        const windowTitle = typeof data.window_title === 'string' ? data.window_title : '';
-        // Backend hiçbir şey okuyamadıysa arayüzde de HİÇBİR ŞEY gösterme —
-        // boş bir satır ya da "bilinmiyor" yazmak, olmayan bir farkındalığı
-        // varmış gibi gösterirdi.
-        if (!app && !windowTitle) {
-          setContext(null);
-          return;
-        }
-
-        setContext({
-          windowTitle,
-          app,
-          idleSeconds: typeof data.idle_seconds === 'number' ? data.idle_seconds : 0,
-          away: Boolean(data.away),
-        });
-      } catch {
-        // Backend kapalı — bağlam satırı sessizce kaybolur.
-        if (!cancelled) setContext(null);
+      // Backend hiçbir şey okuyamadıysa (ya da hiç cevap vermediyse) arayüzde de
+      // HİÇBİR ŞEY gösterme — bir önceki bağlamı ekranda bırakmak, Aıron'un artık
+      // sahip olmadığı bir farkındalığı varmış gibi gösterirdi.
+      const app = typeof data?.app === 'string' ? data.app : '';
+      const windowTitle = typeof data?.window_title === 'string' ? data.window_title : '';
+      if (!app && !windowTitle) {
+        setContext(null);
+        return;
       }
+
+      setContext({
+        windowTitle,
+        app,
+        idleSeconds: typeof data?.idle_seconds === 'number' ? data.idle_seconds : 0,
+        away: Boolean(data?.away),
+      });
     };
 
     void load();

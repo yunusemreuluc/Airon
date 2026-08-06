@@ -22,7 +22,7 @@ const PREFIXES: { prefix: string; kind: LogKind }[] = [
   { prefix: 'err:', kind: 'error' },
 ];
 
-export function parseLogLine(raw: string): { kind: LogKind; text: string } {
+function parseLogLine(raw: string): { kind: LogKind; text: string } {
   const lowered = raw.toLowerCase();
   for (const { prefix, kind } of PREFIXES) {
     if (lowered.startsWith(prefix)) {

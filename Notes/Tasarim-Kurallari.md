@@ -45,6 +45,10 @@ Tepki vermesi gereken beş şey: Ses, Düşünme, Görü, **Otomasyon**, **Hafı
 Beşi de çalışıyor (2026-07-31) — hangi rengin/hareketin neyi anlattığı ve
 hangi aracın hangi durumu tetiklediği [[Arayuz]] § Durum renkleri içinde.
 
+Çekirdeğin **formu** 2026-08-06'da dolu plazma küreden **tel kafes hologramına**
+geçti; yukarıdaki kural değişmedi, yalnızca neyin nefes aldığı değişti. Katmanlar
+ve gerekçeleri [[Arayuz]] § Tel kafes çekirdek.
+
 ## Renk
 
 Doğruluk kaynağı **`frontend/app/globals.css`**. Buraya kopyalanmıyor: bir

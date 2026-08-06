@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import subprocess
 import urllib.parse
-import webbrowser
 
 from actions.browser import browser_control
 from actions.tool_result import fail, ok

@@ -296,6 +296,36 @@ düğmesine *"kırmızı buton"* derse kaçırırdı. Çözüm iki fazlı uygula
 denetim **bulunan şeyin** tarifi üzerinde yapılır, ancak temizse tıklanır.
 Ayrıntı: [[Otonom-Duzeltme]].
 
+## Bir şeyi ÖRTEN cismi kaldırınca örttüğü hata ortaya çıkar
+
+`ElectricArcs` paletin durum rengine yalnızca `speaking` durumunda çekiliyordu;
+`automation` (kehribar) ve `memory` (mor) çekirdeklerin etrafında arklar buz
+mavisi kalıyordu. Palet dosyasının en başında bu hatayı önlemek için yazılmış
+bir kural var — ve kural çiğnenmiş olmasına rağmen **aylarca kimse görmedi**,
+çünkü dolu plazma küre arkların yarısını örtüyordu.
+
+Çekirdek tel kafese dönüp (2026-08-06) `depthWrite` kapanınca arklar cismin
+içinden geçer oldu ve uyumsuzluk ilk ekran görüntüsünde apaçık çıktı.
+
+**Ders:** bir bileşeni saydam/görünür yapan her değişiklik, o bileşenin ARKASINDA
+duran her şeyin de gözden geçirilmesini gerektirir. Değişiklik onları bozmadı —
+zaten bozuklardı, yalnızca görünür oldular. Bu yüzden "sadece çekirdeği
+değiştirdim, arklara dokunmadım" demek yeterli değil: ekrana bakmak gerekiyor.
+
+## Bir formu değiştirirken ışık modelini DEVRALMA
+
+Tel kafes çekirdek, dolu kürenin fresnel kenar payını (0.75) olduğu gibi
+devralmıştı. Dolu yüzeyde o pay yalnızca ince bir silüet şeridini boyuyor;
+kafeste çizgilerin çoğu bakışa göre eğik olduğu için **tüm orb** platin beyaza
+yıkandı ve durum renkleri (buz mavisi / turkuaz / kehribar / mor) birbirinden
+ayırt edilemez oldu. Renk burada bilgi taşıyor — solması sessiz bir kayıp.
+
+Aynı çekimde ikinci ders: küreye sarılan 13 sarımlı bir **spiral**, önden
+bakınca spiral değil **yatay çizgi yığını** gibi okunuyor. Geometri doğruydu,
+görüntü yanlıştı.
+
+İkisi de yalnızca ekran görüntüsüyle yakalandı; `tsc` ve `eslint` temizdi.
+
 ## Kaydırma konumunu içerik eklendikten SONRA ölçme
 
 `useEffect` yeni satır DOM'a girdikten sonra çalışıyor. Orada

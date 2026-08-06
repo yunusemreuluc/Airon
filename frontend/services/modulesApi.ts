@@ -1,4 +1,4 @@
-import { apiBase } from './voiceApi';
+import { fetchData } from './apiClient';
 
 // Sol paneldeki modüllerin (Hafıza, Otomasyon) veri uçları.
 // Bkz. backend/api/memory.py, backend/api/automation.py.
@@ -36,16 +36,6 @@ export interface AutomationSnapshot {
   briefing: Record<string, unknown> | null;
 }
 
-async function get<T>(path: string): Promise<T | null> {
-  try {
-    const response = await fetch(`${apiBase()}${path}`);
-    const result = (await response.json()) as { success?: boolean; data?: T };
-    return result.success && result.data ? result.data : null;
-  } catch {
-    return null;
-  }
-}
+export const fetchMemory = () => fetchData<MemorySnapshot>('/api/memory');
 
-export const fetchMemory = () => get<MemorySnapshot>('/api/memory');
-
-export const fetchAutomation = () => get<AutomationSnapshot>('/api/automation');
+export const fetchAutomation = () => fetchData<AutomationSnapshot>('/api/automation');

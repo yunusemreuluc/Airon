@@ -3,7 +3,7 @@
     "venvPath": ".",
     "venv": "venv",
     "extraPaths": [
-        "venv/lib/python3.14/site-packages"
+        "venv/Lib/site-packages"
     ],
     "reportAttributeAccessIssue": "none",
     "reportArgumentType": "none",

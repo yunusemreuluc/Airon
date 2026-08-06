@@ -64,6 +64,23 @@ kullanılmayan frontend bileşenleri ve iskelet backend uçları da kaldırıld�
 edilmiyorsa yaşamıyordur. "İleride lazım olur" diye tutulan kod, gerçekten lazım
 olduğunda zaten yeniden yazılıyor — bkz. `Docs/AIRON_UI_ROADMAP.md`.
 
+Aynı kural 2026-08-06'da tekrar uygulandı: iskelet backend uçları
+(`GET /api/system/status`, `GET /api/settings/status` — ikisi de "hazır" yazıp
+boş dönüyordu, arayüz hiçbirini çağırmıyordu), hiçbir yerden import edilmeyen
+`GlassButton`, boş `.gitkeep` klasörleri (`animations/`, `assets/`, `effects/`,
+`styles/`, `types/`, `utils/`, `backend/services/`) ve git'te izlenen bir hata
+ayıklama artığı (`logs/airon_ses_ornegi.pcm`) silindi. Aynı turda beş servis
+dosyasındaki tekrar `frontend/services/apiClient.ts` altında toplandı
+([[Arayuz]] § Veri akışı).
+
+**Denetimin nasıl yapıldığı önemli:** `@register_tool` ile kaydedilen araçlar
+`main.py`'de İSİMLE hiç çağrılmıyor — import'un tek amacı dekoratörü
+çalıştırmak. Kör bir "kullanılmayan import" temizliği bu 20+ satırı silip
+araçları sessizce yok ederdi; dosyadaki `noqa: F401` yorumları tam bu yüzden
+duruyor. Ölü kod ararken registry, `TOOL_DECLARATIONS` ve `core/prompt.txt`
+üçlüsü birlikte kontrol edilmeli (2026-08-06'da 36/36 örtüşüyordu; yalnızca
+`read_text` prompt'ta eksikti, eklendi — [[OCR]]).
+
 ## Kaldırılan: Tkinter arayüzü (2026-07-29)
 `ui.py` (3108 satır, "UI v6 Holo Prime") ve `wakeup_listener.py` kullanıcı isteğiyle
 tamamen silindi. Tkinter Canvas gerçek blur/bloom/parçacık üretemediği için yaklaşık bir

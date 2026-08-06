@@ -36,8 +36,18 @@ gösterilecek bir veri **yok**, o yüzden dürüst boş durum gösteriyorlar:
       vermiyor (`sensors_temperatures` çoğu masaüstünde boş döner, GPU için ayrı bir
       satıcı kütüphanesi gerekir). Uydurmak yerine hiç gösterilmiyor.
       (İnternet ve saat 2026-07-31'de eklendi — `Notes/Arayuz.md` § Telemetri şeridi.)
-- [ ] Sol ray etiketi ile AIRON imzası 19×9 px çakışıyor — yerleşim kararı gerekiyor
-      (`Docs/YAPILACAKLAR.md` #19).
+- [ ] Cam düğme stili altı bileşende kopyalanmış — `AssistantDock`,
+      `SettingsPanelContent`, `VoicePanelContent`, `VisionPanel`, `Sidebar`,
+      `NodeFocusCard` aynı iskeleti (`rounded-full border bg-white/[0.04]
+      border-border-subtle ... transition-all duration-200`) elle tekrar yazıyor
+      ve değerler kayıyor (`0.04` ↔ `0.045`, `hover:text-foreground` ↔
+      `hover:text-primary`). Ortak bir `GlassButton` vardı ama hiçbir yerden
+      çağrılmıyordu; 2026-08-06'da kasadaki temizlik kuralı gereği silindi.
+      Doğrusu boyut/ton varyantı olan tek bir kontrol — AMA bu görsel bir
+      değişiklik: `Notes/Bilinen-Tuzaklar.md` § Bakarak doğrula gereği her
+      düğmenin ekran görüntüsüyle karşılaştırılması şart.
+- [ ] Duraklat düğmesi yok — zincirin tamamı hazır, yalnızca kullanıcının
+      basacağı şey eksik (`Notes/Arayuz.md` § Küçük parçalar).
 
 ---
 

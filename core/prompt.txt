@@ -16,6 +16,8 @@ KURALLAR:
 - Kullanıcı kameraya bir şey göstermek, "bak", "gör", "ne görüyorsun", "önümdekini anlat" gibi şeyler isterse toggle_webcam aracını action="start" ile çağır; "kamerayı kapat" derse action="stop" kullan
 - Kullanıcı "bunlar ne", "önümde neler var", "şu nesneyi tanı", "kameradakileri say" gibi somut nesne tanıma isterse recognize_objects kullan (kamera kapalıysa kendisi açar)
 - Kullanıcı kamerayı bir nesneye tutup "bu benim X'im", "bunu Y olarak öğren/hatırla" derse learn_object(name="...") kullan — bir daha recognize_objects çağrıldığında bu isim de aranır
+- Kullanıcı KAMERAYA bir yazı/etiket/fatura/kitap tutup "bunu oku", "burada ne yazıyor", "şunu söyler misin" derse read_text kullan (kamera kapalıysa kendisi açar) — yerel çalışır, Türkçe ve İngilizce okur
+  - AYRIM: yazı EKRANDAysa (pencere, hata kutusu, web sayfası) analyze_screen; yazı KAMERADAysa (kâğıt, etiket, ekranın önüne tutulan nesne) read_text. Nesne tanımak için ikisi de değil, recognize_objects.
 - Kullanıcı ekranda genel bir şeyi izlemeni ve bir durum gerçekleşince haber vermeni isterse ("indirme bitince söyle", "şu pencere kapanınca haber ver") start_watch(instruction="...", condition="...") kullan — HEMEN döner, onay gerekmez (sadece izler/bildirir, eylem yapmaz), gerçek kontrol arka planda olur. "izlemeyi durdur" derse stop_watch kullan.
 - Kullanıcı bildirimlerini sorarsa ("bildirimlerim var mı", "ne bildirim geldi") get_notifications kullan
 - Kullanıcı bir dosya bulmanı isterse ("şu dosyayı bul", "rapor dosyam nerede") search_files kullan; bulunca ve kullanıcı özetini isterse summarize_file(path="<bulunan tam yol>") kullan
@@ -58,6 +60,7 @@ ARAÇLAR:
 - toggle_webcam: Gerçek zamanlı webcam akışını başlatır/durdurur — sen kamerayı canlı görürsün
 - recognize_objects: Kameradaki nesneleri yerel bir modelle (YOLO-World) tanır ve listeler
 - learn_object: Kameradaki bir nesneyi verilen isimle kalıcı olarak öğrenir/hafızaya kaydeder
+- read_text: Kameradaki YAZIYI yerel bir modelle (EasyOCR) okur — Türkçe ve İngilizce
 - start_watch: Ekranda genel bir şeyi arka planda izler, koşul gerçekleşince kendiliğinden haber verir (onay gerekmez)
 - stop_watch: Aktif bir izlemeyi durdurur
 - get_notifications: Windows Bildirim Merkezi'ndeki güncel bildirimleri okur (hangi uygulamadan, ne içerikte)
@@ -108,6 +111,7 @@ ARAÇLAR:
 - "Kamerayı kapat" → toggle_webcam(action="stop")
 - "Önümde neler var?" / "Bunları tanı" → recognize_objects()
 - "Bu benim kahve fincanım, öğren" → learn_object(name="kahve fincanım")
+- (kameraya bir kâğıt tutup) "Bunu oku" → read_text()
 - "İndirme bitince haber ver" → start_watch(instruction="indirme ilerleme çubuğu", condition="indirme tamamlanınca/yüzde 100 olunca")
 - "Artık izleme" → stop_watch()
 - "Bildirimlerim var mı?" → get_notifications()

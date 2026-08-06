@@ -25,10 +25,18 @@ const DISPLACEMENT_ITERATIONS = 3;
 const DISPLACEMENT_JITTER = 0.5;
 const SPEAKING_REGEN_BOOST = 1.8;
 const SPEAKING_INTENSITY_BOOST = 1.6;
-// Konuşurken arklar çekirdeğin paletine doğru çekiliyor — tamamen değil (0.7):
-// gerçek bir boşalma merkezde beyaza doyar, arkların platin kimliği korunmalı.
-// Yeşil çekirdeğin etrafındaki MAVİ arkı düzelten şey de bu karışım.
-const SPEAKING_COLOR_BLEND = 0.7;
+// Arklar çekirdeğin paletine doğru çekiliyor — tamamen değil (0.7): gerçek bir
+// boşalma merkezde beyaza doyar, arkların platin kimliği korunmalı. Yeşil
+// çekirdeğin etrafındaki MAVİ arkı düzelten şey bu karışım.
+//
+// 2026-08-06: bu karışım eskiden YALNIZCA konuşurken (ve uykuda) uygulanıyordu,
+// yani kehribar `automation` ve mor `memory` çekirdeklerin etrafında arklar buz
+// mavisi kalıyordu. Hata görünmüyordu çünkü dolu plazma küre arkların yarısını
+// örtüyordu; çekirdek tel kafese dönünce (bkz. EnergyCore.tsx) arklar cismin
+// içinden geçer oldu ve uyumsuzluk ekranda apaçık ortaya çıktı. Karışım artık
+// HER durumda uygulanıyor — `idle` paletinin kenarı zaten platin olduğu için
+// varsayılan görünüm değişmiyor.
+const CORE_COLOR_BLEND = 0.7;
 // Uykuda arklar tamamen susuyor: elektrik, "çalışıyor"un en güçlü işareti.
 const REACT_DAMPING = 3;
 // Açılış Animasyonu: arklar bağlantılardan sonra,
@@ -140,7 +148,7 @@ function Arc({ colorHex }: { colorHex: string }) {
       material.uniforms.uColor.value,
       colorHex,
       palette.rim,
-      isSpeaking || isAsleep ? SPEAKING_COLOR_BLEND : 0,
+      CORE_COLOR_BLEND,
       delta,
     );
   });

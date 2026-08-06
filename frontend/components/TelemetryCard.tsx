@@ -10,7 +10,7 @@ import {
   LuWifiOff,
 } from 'react-icons/lu';
 import type { IconType } from 'react-icons';
-import { apiBase } from '@/services/voiceApi';
+import { fetchData } from '@/services/apiClient';
 import { GlassPanel } from './GlassPanel';
 
 // Sistem telemetrisi — Notes/Tasarim-Kurallari.md § Panel yerleşimi'ın karşılığı.
@@ -79,14 +79,11 @@ export function TelemetryCard() {
 
   useEffect(() => {
     let cancelled = false;
+    // Backend kapalıysa `fetchData` null döner, kart sessizce gizli kalır —
+    // hata göstermeye değmez.
     const load = async () => {
-      try {
-        const response = await fetch(`${apiBase()}/api/system/telemetry`);
-        const result = (await response.json()) as { success?: boolean; data?: Telemetry };
-        if (!cancelled && result.success && result.data) setData(result.data);
-      } catch {
-        // Backend kapalıysa kart sessizce gizli kalır — hata göstermeye değmez.
-      }
+      const telemetry = await fetchData<Telemetry>('/api/system/telemetry');
+      if (!cancelled && telemetry) setData(telemetry);
     };
     void load();
     const timer = window.setInterval(() => void load(), REFRESH_MS);

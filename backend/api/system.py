@@ -74,11 +74,6 @@ async def _probe_internet() -> dict[str, object]:
     return sonuc
 
 
-@router.get("/status")
-async def system_status() -> dict:
-    return {"success": True, "message": "system endpoint iskeleti hazır", "data": {}}
-
-
 @router.get("/telemetry")
 async def telemetry() -> dict:
     """Üst telemetri kartının verisi (2026-07-30).

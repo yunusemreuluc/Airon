@@ -57,3 +57,13 @@ Sonuçlar `vision_text` olayıyla Vision paneline akıyor ([[Arayuz]]): kutular 
 üzerine çiziliyor, birleşik metin altta gösteriliyor ve kopyalanabiliyor.
 
 Tool: `read_text` ([[Arac-Tanimlari]]).
+
+## Ekran mı, kamera mı
+
+`core/prompt.txt` 2026-08-06'ya kadar `read_text`'ten hiç söz etmiyordu —
+şema (`tool_defs.py`) ve fonksiyon vardı, modele "ne zaman çağıracağı"
+söylenmemişti (CLAUDE.md § Adding a new tool, üçüncü yer). Eklenirken asıl
+mesele ayrımdı: "bunu oku" hem ekrandaki bir hata kutusu hem kameraya tutulan
+bir kâğıt için söyleniyor. Prompt artık ikisini ayırıyor — yazı **ekrandaysa**
+`analyze_screen`, **kameradaysa** `read_text`, nesne tanıma ise ikisi de değil
+`recognize_objects`.

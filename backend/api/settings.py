@@ -16,7 +16,7 @@ import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app_config import get_app_config_value, load_app_config, save_app_config
+from app_config import load_app_config, save_app_config
 from backend.core import commands
 
 logger = logging.getLogger("airon.backend")
@@ -148,8 +148,3 @@ async def minimize_to_tray() -> dict:
     if not commands.dispatch("tray", {}):
         return {"success": False, "message": "Tepsi bu pencerede kullanılamıyor.", "data": {}}
     return {"success": True, "message": "Tepsiye alındı", "data": {}}
-
-
-@router.get("/status")
-async def settings_status() -> dict:
-    return {"success": True, "message": "ayarlar hazır", "data": {"voice": get_app_config_value("voice")}}

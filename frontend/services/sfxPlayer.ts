@@ -1,4 +1,4 @@
-import { apiBase } from './voiceApi';
+import { apiBase } from './apiClient';
 
 // Ses efektleri. Tkinter sürümünde Python çalıyordu (ui.py SoundManager);
 // 3D arayüzde tarayıcı çalıyor — dosyalar backend'den sunuluyor (/sfx).

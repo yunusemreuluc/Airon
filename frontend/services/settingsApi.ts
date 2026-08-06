@@ -1,4 +1,4 @@
-import { apiBase } from './voiceApi';
+import { fetchData, request } from './apiClient';
 
 // Ayarlar — Tkinter penceresindeki ayar panelinin (ui.py) web karşılığı.
 // Kaynak tek: config/api_keys.json (bkz. backend/api/settings.py).
@@ -15,28 +15,7 @@ export interface Settings {
   shortcutExists: boolean;
 }
 
-interface ApiResult<T = Record<string, unknown>> {
-  success: boolean;
-  message: string;
-  data?: T;
-}
-
-async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T>> {
-  try {
-    const response = await fetch(`${apiBase()}${path}`, {
-      headers: { 'Content-Type': 'application/json' },
-      ...init,
-    });
-    return (await response.json()) as ApiResult<T>;
-  } catch {
-    return { success: false, message: 'Aıron çalışmıyor.' };
-  }
-}
-
-export async function fetchSettings(): Promise<Settings | null> {
-  const result = await request<Settings>('/api/settings');
-  return result.success && result.data ? result.data : null;
-}
+export const fetchSettings = () => fetchData<Settings>('/api/settings');
 
 export function saveSettings(patch: Partial<Settings> & { geminiApiKey?: string }) {
   return request('/api/settings', { method: 'POST', body: JSON.stringify(patch) });

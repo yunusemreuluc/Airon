@@ -3,7 +3,6 @@ Tarayıcı kontrolü — Windows için webbrowser modülü ile çalışır.
 """
 
 import re
-import subprocess
 import urllib.parse
 import webbrowser
 
