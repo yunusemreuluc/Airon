@@ -36,6 +36,8 @@ Not bir kaynağı özetliyorsa dosya:satır referansı verir — detay gerekirse
 - [[Webcam]] — canlı webcam akışı (main.py, WebcamStreamer)
 - [[Screen-Vision]] — aktif pencere ekran görüntüsü + Gemini vision analizi
 - [[Ekran-Mudahale]] — ekranda öge bulup tıklama/yazma (iki adımlı onay)
+- [[Makro]] — şablon eşleştirmeli otomatik tıklama, sol paneldeki Makro modülü
+  (araç değil, panel — vision yerine `cv2.matchTemplate`)
 - [[Nesne-Tanima]] — kameradaki nesneler, YOLO-World (yerel) + öğretme
 - [[OCR]] — kameradaki yazıyı okuma, EasyOCR (yerel, Türkçe+İngilizce)
 - [[Izleme-ve-Brifing]] — proaktif izlemeler, günlük brifing, aktivite günlüğü

@@ -296,6 +296,89 @@ düğmesine *"kırmızı buton"* derse kaçırırdı. Çözüm iki fazlı uygula
 denetim **bulunan şeyin** tarifi üzerinde yapılır, ancak temizse tıklanır.
 Ayrıntı: [[Otonom-Duzeltme]].
 
+## Mikrofon: host API'yi de ölç, yalnızca cihazı değil
+
+2026-08-06'da Aıron kullanıcıyı duymuyordu (`karar=silent medyan=0.5`). Bu
+makinedeki HER giriş cihazı, HER host API üzerinden ayrı ayrı ölçüldü
+(`probe_input` ile — uygulamanın kendi ölçüsü, ayrı bir ölçüt uydurulmadı):
+
+| Host API | Cihaz | 16 kHz | Native (48 kHz) |
+|---|---|---|---|
+| MME | Headset Microphone (varsayılan) | medyan 0.49, tepe 0.53 | tepe 0.50 |
+| MME | Microphone Array (AMD) | medyan 0.49, tepe 0.92 | — |
+| DirectSound | hepsi | medyan **12612**, tepe 23417 | medyan 1371 |
+| WASAPI | Headset Microphone | **açılamıyor** (Invalid sample rate) | medyan 0.00, tepe 5.6 |
+| WASAPI | Microphone Array (AMD) | **açılamıyor** | medyan 0.94, **tepe 361**, yayılım 71 |
+
+Kullanıcı konuşurken ölçüldüğünde iki WASAPI cihazı da **çalıştı** (kulaklık
+tepe 19771, dizi 3911). Yani donanım sağlam, sorun tamamen yoldaydı. Üç ders:
+
+**1. PortAudio varsayılanı MME ve bu makinede MME ölü.** `mic_device` boşken
+PortAudio varsayılanı seçiyordu, o da MME Headset.
+
+**2. `resolve_device_index` host API'ye bakmıyor.** İsim ipucuna göre indeks
+sırasıyla ilk eşleşmeyi alıyor; `"Microphone Array"` yazmak MME'deki (ölü)
+kopyayı seçiyordu. Yani config'i doğru yazmak bile sorunu çözmüyordu.
+
+**3. WASAPI 16 kHz'i reddediyor** (`Invalid sample rate`) — paylaşımlı modda
+cihazın kendi hızını istiyor. `SEND_SAMPLE_RATE = 16000` sabit olduğu için
+çalışan tek yol hiç denenmiyordu.
+
+Çözüm (2026-08-06): `resolve_input_device` WASAPI'yi tercih ediyor ve sistemin
+varsayılan cihazının ADINI o API altında arıyor (kullanıcının Windows'ta yaptığı
+seçime saygı, yalnızca yol değişiyor); `open_input_stream` hızı uzlaşıyor ve
+`downsample_int16` 48 kHz'i 16 kHz'e indiriyor.
+
+**DirectSound'a güvenme ama eşiğe de güvenme.** DirectSound bu makinede çöp
+üretiyor; ardışık iki ölçümde medyan **12612** ve **838** (ikincisinde tepe
+27070) verdi. Yani "makul olmayan seviye" kapısı bazen yakalıyor bazen
+kaçırıyor — asıl koruma cihaz seçiminin WASAPI'yi tercih etmesi, eşik yalnızca
+ikinci savunma hattı.
+
+## Sessiz mikrofonla ölü mikrofon AYIRT EDİLEMEZ
+
+`core/audio_devices.py`'nin kurucu varsayımı şuydu: "çalışan bir mikrofon sessiz
+odada bile gürültü tabanı üretir; ölü akış tam sıfır döndürür." Medyan 3.0'ın
+altındaysa kullanıcıya **"mikrofonun BOZUK"** deniyordu.
+
+2026-08-06'da çürüdü. Aynı Realtek kulaklık, WASAPI, aynı gün:
+
+| Ne zaman | medyan | tepe | yayılım |
+|---|---|---|---|
+| sessizken (1. ölçüm) | 0.00 | 5.6 | 1.13 |
+| sessizken (2. ölçüm) | 0.00 | 0.0 | **0.00** |
+| konuşurken | — | **19771** | — |
+
+WASAPI, MME'nin aksine sahte bir gürültü tabanı uydurmuyor: sinyal yoksa gerçek
+dijital sıfır veriyor. Yani **çalışan** mikrofon "ölü" görünüyordu.
+
+İlk düzeltme denemesi "seviyeye değil DEĞİŞİME bak" idi (yayılım 1.13 vs ölü
+MME'nin 0.01'i). İkinci ölçüm onu da çürüttü — yayılım da 0.00 çıkabiliyor.
+
+**Kalıcı sonuç: ses olmadan bu ayrım YAPILAMAZ.** Eşik ayarı sorunu değil, bilgi
+eksikliği. Sonda artık sessizliğe arıza demiyor; `describe_input_problem`
+(kanıtlanmış arıza → sohbete ERR) ile `describe_input_observation` (gözlem →
+yalnızca geliştirici akışı) ayrı fonksiyonlar. İkisini tek metne karıştırmak,
+ölçülmemiş bir arızayı ölçülmüş gibi göstermek olurdu.
+
+Bu, § Arayüzde dürüstlük kuralının teşhis mesajlarına uzanan hâli: **alınmamış
+bir ölçümü asla iddia etme** — "hiçbir şey duymadım" ile "mikrofonun bozuk"
+aynı cümle değil.
+
+## "Mikrofon hatasi" her zaman mikrofon değildir
+
+`_listen_audio` kapanış yarışında `RuntimeError: cannot schedule new futures
+after shutdown` fırlatıyor: sohbet sıfırlanırken event loop'un thread havuzu
+mikrofon döngüsünden önce kapanıyor. Bu ERROR seviyesinde, tam traceback ile,
+`[AIRON] Mikrofon hatasi` başlığıyla loglanıyordu.
+
+2026-08-06'da gerçek bir mikrofon sessizliği araştırılırken bu satıra takılıp
+yanlış yere bakıldı — normal bir yeniden bağlanma, donanım arızası gibi
+okunuyordu. Artık ayrı yakalanıp INFO olarak yazılıyor.
+
+**Ders:** sessiz arıza kadar pahalı olan şey, arıza OLMAYANI arıza diye
+raporlamaktır. İkisi de teşhisi yanlış yere götürüyor.
+
 ## Bir şeyi ÖRTEN cismi kaldırınca örttüğü hata ortaya çıkar
 
 `ElectricArcs` paletin durum rengine yalnızca `speaking` durumunda çekiliyordu;
@@ -325,6 +408,39 @@ bakınca spiral değil **yatay çizgi yığını** gibi okunuyor. Geometri doğr
 görüntü yanlıştı.
 
 İkisi de yalnızca ekran görüntüsüyle yakalandı; `tsc` ve `eslint` temizdi.
+
+## "Ekran durdu mu" MUTLAK eşikle ölçülemez
+
+`gemini_automation.py` görsel üretiminin bitişini sabit 18 saniye bekleyerek
+tahmin ediyordu. Yerine "ekran değişmeyi bırakınca bitmiştir" tespiti kondu:
+ardışık ekran görüntülerinin 64x64 gri parmak izleri karşılaştırılıyor
+(tamamen yerel, Gemini çağrısı harcamıyor).
+
+İlk sürüm mutlak bir eşik kullandı (fark < 1.5 ise "durdu"). **Ölçümde çürüdü:**
+hiçbir şey yapılmayan durgun bir masaüstünde ardışık kareler arasındaki fark
+**15-71/255** aralığında geziyordu (imleç, saat, animasyonlu bileşenler). Eşik
+hiç tetiklenmedi, fonksiyon her turda tavana kadar bekledi — yani sabit
+beklemeden **daha kötü**.
+
+Doğrusu göreli: üretim sürerken fark tepe yapar, bitince tabana iner. Tepenin
+belirgin bir kesrine düşmek (`SETTLE_DROP_RATIO`) "durdu" demek. Aynı gürültülü
+ortamda 45 sn tavan yerine 13 sn'de durdu.
+
+**İkinci ders — hangi karar neye emanet:** aynı piksel farkı "yazı gönderildi
+mi" sorusuna cevap veremez, çünkü taban gürültüsü gerçek bir değişiklikten
+ayırt edilemiyor. Bölüm net: **piksel farkı ZAMANLAMA için, vision DOĞRULUK
+için.** Yanlış zamanlama vakit kaybettirir; yanlış doğrulama "yaptım dedi ama
+yapmadı" hatasını geri getirir (§ Arayüzde dürüstlük).
+
+## İndirme "tıkladım"la değil "dosya geldi"yle doğrulanır
+
+Aynı dosyada `_download_latest_image` başarıyı indirme ikonuna tıklayabilmekten
+sayıyordu. Tıklama başarılı olup indirme hiç başlamayabilir — o durumda araç
+kullanıcıya olduğundan fazla görsel indirdiğini söylerdi.
+
+Artık yer gerçeği İndirilenler klasörü: tıklamadan önce dosya listesi alınıyor,
+sonra yeni ve **yazılması bitmiş** (`.crdownload` değil, boyutu iki ölçümde
+sabit) bir dosya belirene kadar bekleniyor. Sayaç artık dosya sayıyor.
 
 ## Kaydırma konumunu içerik eklendikten SONRA ölçme
 

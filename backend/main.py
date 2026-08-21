@@ -19,7 +19,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.api import automation, memory, settings, system, vision, voice
+from backend.api import automation, macro, memory, settings, system, vision, voice
 from backend.core.config import CORS_ORIGINS
 from backend.websocket.manager import manager
 from backend.websocket.router import router as websocket_router
@@ -55,7 +55,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for router_module in (voice, system, settings, vision, memory, automation):
+for router_module in (voice, system, settings, vision, memory, automation, macro):
     app.include_router(router_module.router)
 
 app.include_router(websocket_router)

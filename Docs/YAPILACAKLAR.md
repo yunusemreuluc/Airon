@@ -30,6 +30,45 @@ Microsoft Graph API ile gerçek OAuth entegrasyonu gerekiyor — bu kullanıcın
 tarafında iş (Google Cloud Console / Azure'da uygulama kaydı) gerektiren ayrı,
 daha büyük bir görev. İleride dönülecek.
 
+## 22. Görsel üretimini tarayıcıdan API'ye taşıma
+**Şimdilik ertelendi (2026-08-07)** — engel para değil, ödeme kurulumu.
+
+**İstenen:** "şu promptla 20 görsel üret" denince Aıron'un donmadan, fareyi
+işgal etmeden, arka planda üretip indirmesi.
+
+**Bugünkü yol neden yetmiyor:** `gemini_desktop_task` ([[Gemini-Masaustu]])
+işi yapıyor ama kullanıcının canlı denemesinde iki sorun çıktı — fare yanlış
+yerlere tıklıyor ve akış çok yavaş. Teşhis: DPI ölçekleme **değil** (ölçüldü,
+tıklama uzayı ile görüntü uzayı 1920x1080 örtüşüyor, süreç SYSTEM_AWARE).
+Sebep vision'ın konum hassasiyeti: 0-1000 normalize koordinat 1920 pikselde
+~2 piksel/birim çözünürlük demek ve bir görselin köşesindeki küçük indirme
+ikonu için yetmiyor. Yavaşlık da yöntemin doğasında — her adım bir ekran
+görüntüsü + model çağrısı. İkisi de ayarla düzelecek hatalar değil.
+
+**API yolunun engeli:** kullanıcının anahtarıyla ölçüldü — görsel üretim
+modellerinin üçünde de ücretsiz katman `limit: 0`
+(`gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`, `gemini-3-pro-image`),
+`imagen-4.0-*` ise 404. Gemini Pro aboneliği web arayüzünü kapsıyor, API'yi
+değil. Yani faturalandırma açmak şart: AI Studio → API keys → Set up billing,
+Prepay'de minimum $10.
+
+**Maliyet:** ~$0.045/görsel (flash) → 20 görsel ~$0.90; pro ~$0.134 → ~$2.68.
+Batch API'de %50 indirim.
+
+**Devam edilirse yapılacak:** `generate_images` aracı (Gemini image API,
+tarayıcı ve fare yok, paralel üretim, dosyaya yazma). Kod faturalandırmadan
+bağımsız yazılabilir, aktifleşince çalışır.
+
+**Faturalandırma açılırsa ilk iş:** `aistudio.google.com/spend` üzerinden aylık
+tavan koymak. Tier 1 varsayılanı $250 ve bir döngü hatası bunu gecede yakar —
+ekran bekçisi dersinin para hâli ([[Bilinen-Tuzaklar]]).
+
+**Bu arada yapıldı:** tarayıcı yolunun güvenilirliği artırıldı (sabit 18 sn
+bekleme yerine ekranın durmasını bekleme, indirmeyi dosya sisteminden
+doğrulama, tur başına bir vision çağrısı azaltma, dürüst sayaç). Bu
+iyileştirmeler yukarıdaki iki temel sorunu çözmüyor ama araç API'ye geçilene
+kadar kullanılacaksa daha az yalan söylüyor. Canlı testi yapılmadı.
+
 ---
 
 # CLAUDE.md'ye göre eksikler
@@ -63,6 +102,33 @@ Model bu ayarı reddederse `_is_thinking_rejection` yakalayıp
 asistanın çalışması muhakeme akışına feda edilmiyor. Timeline'da muhakeme
 satırı hiç görünmüyorsa sebep budur; `debug` akışında uyarı satırı çıkar.
 
+### İlk canlı deneme (2026-08-06) — sonuçsuz, teşhis eklendi
+
+Çok adımlı planlama sorusu soruldu (üç iş, üç kısıt, tek doğru sıra). Aıron
+doğru cevabı verdi ama **muhakeme satırı hiç çıkmadı**.
+
+Elenen ihtimal: valf devreye girmedi. Log'da 19:52:42'de tek bir "Bağlandı"
+var, yeniden bağlanma yok, `thinking_config` reddi yok — yani ayar **kabul
+edildi**.
+
+Elenmeyen iki ihtimal ve neden ayırt edilemedi: Temmuz log'larında SDK'nın
+`non-data parts in the response: ['text', 'thought']` uyarısı var ve bunlar
+vision çağrılarından DEĞİL, Live oturumundan geliyor (her biri bir araç
+çağrısıyla aynı saniyede). Ama o uyarı yalnızca **alanın var olduğunu**
+söylüyor, **değerini değil** — `thought=False` taşıyan sıradan bir metin parçası
+da aynı uyarıyı üretir. Yani "model düşünce gönderiyor ama biz kaçırıyoruz" ile
+"model hiç göndermiyor" ihtimalleri log'dan ayrılmıyor.
+
+Bu yüzden `_receive_audio` içine bağlantı başına **bir kez** çalışan bir teşhis
+kondu: metin taşıyan ilk parçanın gerçek `thought` değerini yazıyor
+(`🧠 model_turn parçası: thought=...`). Bir sonraki oturumda:
+
+- `thought=True` → model gönderiyor, hata bizde; boru hattı incelenecek.
+- `thought=False` → model düşünce göndermiyor, kod doğru. Madde silinir,
+  "bu model sürümü desteklemiyor" olarak kasaya yazılır.
+- Satır **hiç yok** → `model_turn` metin parçası hiç gelmiyor (yalnızca ses +
+  araç çağrısı). O zaman muhakeme başka bir alandan aranmalı.
+
 ## 14. Yüz tanıma
 `CLAUDE.md` § RIGHT PANEL: Camera ✓, Object Detection ✓, OCR ✓, **Face
 Recognition ✗**.
@@ -80,6 +146,24 @@ Aıron'u sese sağır bırakabilir.
 Denenecekse: kotanın bol olduğu bir anda, `_thinking_supported` desenindeki gibi
 bir güvenlik valfiyle (reddedilirse/susarsa anında kapat ve yeniden bağlan).
 Kazancı, modelin bağlamı çağırmayı unutamaması olurdu.
+
+## 21. Mikrofon — düzeltildi, CANLI ONAY BEKLİYOR
+
+Ölçüm yapıldı (2026-08-06): iki WASAPI mikrofonu da konuşurken yanıt veriyor
+(kulaklık tepe 19771, dizi 3911). Donanım sağlam, sorun tamamen koddaydı;
+düzeltme yazıldı ve bileşen bileşen test edildi.
+
+Yapılanlar ve ölçümler: [[Bilinen-Tuzaklar]] § Mikrofon: host API'yi de ölç ve
+§ Sessiz mikrofonla ölü mikrofon ayırt edilemez.
+
+Test edilen: aşağı örnekleyici (48k/44.1k→16k, uzunluk + RMS korunumu + uç
+durumlar), cihaz seçimi (boş config → WASAPI kulaklık; `"Microphone Array"` →
+WASAPI dizi, artık MME kopyası değil), hız uzlaşması (16 kHz reddedildi →
+48 kHz'de açıldı, 427 ms ham → 427 ms @16k).
+
+**Doğrulanmayan tek şey: Aıron gerçekten duyuyor mu.** Boru hattının tamamı
+ayrı ayrı çalışıyor ama uçtan uca canlı bir oturumda konuşulup yanıt alınmadı.
+Aıron'u aç, konuş; yanıt veriyorsa bu madde silinir.
 
 ---
 

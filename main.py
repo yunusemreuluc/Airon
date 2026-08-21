@@ -28,9 +28,13 @@ from google import genai  # type: ignore[reportMissingImports]
 from google.genai import types  # type: ignore[reportMissingImports]
 
 from core.audio_devices import (
+    describe_input_observation,
     describe_input_problem,
+    downsample_int16,
+    open_input_stream,
     probe_input,
     resolve_device_index,
+    resolve_input_device,
 )
 from core.logging_setup import setup_logging
 from core.tool_registry import register_tool, dispatch_tool
@@ -311,6 +315,9 @@ class AironLive:
         # Modelin düşünme adımlarını isteyip istemediğimiz. Bir kez reddedilirse
         # süreç boyunca kapalı kalır — bkz. _build_config ve bağlantı hatası dalı.
         self._thinking_supported = True
+        # Teşhis bayrağı: `model_turn` parçasının gerçek `thought` değeri
+        # bağlantı başına yalnızca BİR KEZ loglanıyor (bkz. _receive_audio).
+        self._logged_part_shape = False
 
         self.ui.on_text_command  = self._on_text_command
         self.ui.on_pause_toggle  = self._on_pause_toggle
@@ -1290,12 +1297,26 @@ class AironLive:
         probe = await asyncio.to_thread(
             probe_input, pya, device_index, SEND_SAMPLE_RATE, MIC_PROBE_SECONDS
         )
-        detail = f"karar={probe.verdict} medyan={probe.median:.1f} değişim={probe.spread:.1f}"
+        detail = (
+            f"karar={probe.verdict} medyan={probe.median:.1f} "
+            f"değişim={probe.spread:.1f} hız={probe.rate}"
+        )
         problem = describe_input_problem(probe)
         if problem:
             logger.warning("[AIRON] 🎤 Mikrofon sağlık kontrolü başarısız (%s)", detail)
             self.ui.write_log(f"ERR: {problem}")
             self.ui.write_debug(f"Mikrofon sondası: {detail}", level="ERROR")
+            return
+
+        # Sessizlik ARIZA DEĞİL (bkz. core/audio_devices.py § SESSİZLİK ARIZA
+        # DEĞİLDİR): sessiz odada çalışan bir mikrofon da sıfır okuyor. Bu yüzden
+        # sohbete ERR olarak DÜŞMÜYOR — kullanıcıyı olmayan bir arızayla
+        # korkutmak, gerçek arızayı kaçırmak kadar zarar veriyor. Yalnızca
+        # geliştirici akışında uyarı olarak duruyor.
+        observation = describe_input_observation(probe)
+        if observation:
+            logger.info("[AIRON] 🎤 Mikrofon açılışta sessizdi (%s)", detail)
+            self.ui.write_debug(f"Mikrofon sondası: {detail} — {observation}", level="WARN")
         else:
             logger.info("[AIRON] 🎤 Mikrofon sağlıklı (%s)", detail)
 
@@ -1325,22 +1346,24 @@ class AironLive:
         # varsayılanı. Varsayılan cihaz sessiz kaldığında kullanıcının koda
         # dokunmadan başka bir mikrofona geçebilmesi için.
         device_index = await asyncio.to_thread(
-            resolve_device_index, pya, "input", str(get_app_config_value("mic_device", "") or "")
+            resolve_input_device, pya, str(get_app_config_value("mic_device", "") or "")
         )
         await self._check_microphone_health(device_index)
 
-        open_kwargs = {"input_device_index": device_index} if device_index is not None else {}
-        stream = await asyncio.to_thread(
-            pya.open,
-            format=FORMAT, channels=CHANNELS,
-            rate=SEND_SAMPLE_RATE, input=True,
-            frames_per_buffer=CHUNK_SIZE,
-            **open_kwargs,
+        # Akış cihazın kabul ettiği hızda açılıyor, istediğimiz hızda değil:
+        # WASAPI paylaşımlı modda 16 kHz'i reddediyor ve bu makinede çalışan tek
+        # yol o. Gelen tamponlar Gemini'ye gitmeden 16 kHz'e indiriliyor.
+        stream, capture_rate = await asyncio.to_thread(
+            open_input_stream, pya, device_index, SEND_SAMPLE_RATE, CHUNK_SIZE
         )
         try:
             while True:
-                data = await asyncio.to_thread(
+                raw = await asyncio.to_thread(
                     stream.read, CHUNK_SIZE, exception_on_overflow=False)
+                # Seviye göstergesi de gönderilen sesten hesaplanıyor, ham
+                # tampondan değil: dalga formu Aıron'un GERÇEKTEN duyduğu şeyi
+                # göstermeli.
+                data = downsample_int16(raw, capture_rate, SEND_SAMPLE_RATE)
                 with self._speaking_lock:
                     airon_speaking = self._is_speaking
                 listening = not airon_speaking and not self.ui.muted and not self._paused
@@ -1351,7 +1374,24 @@ class AironLive:
                 self.ui.update_mic_level(self._mic_level(data) if listening else 0.0)
                 if listening:
                     await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
-        except Exception as e:
+        except RuntimeError as e:
+            # Oturum kapanırken (sohbet sıfırlama, yeniden bağlanma) event
+            # loop'un thread havuzu bu döngüden ÖNCE kapanabiliyor; o zaman
+            # `asyncio.to_thread` "cannot schedule new futures after shutdown"
+            # fırlatıyor. Mikrofonla hiç ilgisi yok — kapanış yarışı.
+            #
+            # Eskiden bu da `logger.exception("Mikrofon hatasi")` ile ERROR
+            # olarak yazılıyordu ve log'da gerçek bir donanım arızası gibi
+            # duruyordu. 2026-08-06'da mikrofon sessizliği araştırılırken tam
+            # olarak buna takılıp yanlış yere bakıldı: normal bir yeniden
+            # bağlanma, arıza gibi okunuyordu. Sessiz arıza kadar pahalı olan
+            # şey, arıza olmayanı arıza diye raporlamaktır.
+            if "after shutdown" in str(e):
+                logger.info("[AIRON] 🎤 Mikrofon döngüsü kapanışta durdu (normal).")
+                return
+            logger.exception("[AIRON] Mikrofon hatasi")
+            raise
+        except Exception:
             logger.exception("[AIRON] Mikrofon hatasi")
             raise
         finally:
@@ -1376,6 +1416,7 @@ class AironLive:
 
     async def _receive_audio(self):
         logger.info("[AIRON] 👂 Alım başladı")
+        self._logged_part_shape = False
         out_buf, in_buf, thought_buf = [], [], []
         output_noise = False
         output_noise_samples = []
@@ -1394,10 +1435,25 @@ class AironLive:
                         # aynı listede, bayrakla ayrışıyorlar.
                         if sc.model_turn and sc.model_turn.parts:
                             for part in sc.model_turn.parts:
-                                if getattr(part, "thought", False):
-                                    piece = str(getattr(part, "text", "") or "")
-                                    if piece:
-                                        thought_buf.append(piece)
+                                thought_flag = getattr(part, "thought", None)
+                                piece = str(getattr(part, "text", "") or "")
+                                # TEŞHİS (2026-08-06): muhakeme satırı canlı
+                                # oturumda hiç görünmedi ve log iki ihtimali
+                                # ayırt etmiyordu — model düşünce göndermiyor mu,
+                                # yoksa `thought` alanı hep False mu geliyor?
+                                # SDK'nın "non-data parts: ['text','thought']"
+                                # uyarısı yalnızca ALANIN VARLIĞINI söylüyor,
+                                # değerini değil. Bağlantı başına bir kez, ilk
+                                # metin taşıyan parçanın gerçek bayrağını yaz.
+                                if piece and not self._logged_part_shape:
+                                    self._logged_part_shape = True
+                                    logger.info(
+                                        "[AIRON] 🧠 model_turn parçası: thought=%r (%d karakter)",
+                                        thought_flag,
+                                        len(piece),
+                                    )
+                                if thought_flag and piece:
+                                    thought_buf.append(piece)
                             self._flush_reasoning(thought_buf)
 
                         if sc.output_transcription and sc.output_transcription.text:

@@ -1,11 +1,20 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { LuBrain, LuGlobe, LuSettings, LuUsers, LuWorkflow, LuX } from 'react-icons/lu';
+import {
+  LuBrain,
+  LuGlobe,
+  LuMousePointerClick,
+  LuSettings,
+  LuUsers,
+  LuWorkflow,
+  LuX,
+} from 'react-icons/lu';
 import type { IconType } from 'react-icons';
 import { useNavigationStore, type ModuleId } from '@/stores/navigationStore';
 import { AutomationPanelContent } from './AutomationPanelContent';
 import { GlassPanel } from './GlassPanel';
+import { MacroPanelContent } from './MacroPanelContent';
 import { MemoryPanelContent } from './MemoryPanelContent';
 import { SettingsPanelContent } from './SettingsPanelContent';
 
@@ -37,6 +46,12 @@ const MODULE_CONTENT: Record<ModuleId, ModuleContent> = {
     icon: LuWorkflow,
     description: '',
     content: AutomationPanelContent,
+  },
+  macro: {
+    title: 'Makro',
+    icon: LuMousePointerClick,
+    description: '',
+    content: MacroPanelContent,
   },
   agents: {
     title: 'Ajanlar',

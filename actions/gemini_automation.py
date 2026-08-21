@@ -23,10 +23,12 @@ adım-mantığını art arda zincirlediği için içe aktarmak daha doğru; kopy
 
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 
 from google import genai
+from PIL import Image, ImageChops
 
 from app_config import get_app_config_value
 from actions.tool_result import fail, ok
@@ -44,8 +46,34 @@ except ImportError:
     pyautogui = None
 
 MODE_LABELS = {"chat": "normal sohbet", "image": "görüntü oluştur", "video": "video oluştur"}
-IMAGE_GENERATION_WAIT_SECONDS = 18
 MAX_REPEAT_COUNT = 50
+
+# Görsel üretiminin bittiğini SABİT beklemeyle değil, ekranın durmasından
+# anlıyoruz. Bu tespit tamamen yerel (PIL karşılaştırması) — tek bir Gemini
+# çağrısı bile harcamaz. Eski `IMAGE_GENERATION_WAIT_SECONDS = 18` hem yavaş
+# üretimde erken davranıp bir önceki görseli tekrar indiriyor, hem de hızlı
+# üretimde boşuna bekliyordu.
+GENERATION_MIN_WAIT_SECONDS = 4.0
+GENERATION_MAX_WAIT_SECONDS = 45.0
+SETTLE_SAMPLE_INTERVAL = 1.2
+SETTLE_STABLE_SAMPLES = 2
+FINGERPRINT_SIZE = (64, 64)
+
+# Ekran "durdu" kararı MUTLAK bir eşikle verilemiyor: masaüstünde her zaman
+# küçük hareketler var (imleç, saat, animasyonlu bileşenler) ve ölçümde
+# durgun ekranda bile ardışık kareler arasında ~34/255 fark görüldü. Sabit
+# eşik bu ortamda hiç tetiklenmez, her turda tavana kadar beklenirdi.
+# Bu yüzden karar GÖRELİ: üretim sürerken fark tepe yapar, bitince tabana
+# iner. Tepenin belirgin bir kesrine düşmek "durdu" demektir. Gerçekten
+# hareketsiz ekranlar için mutlak sessizlik eşiği de ayrıca korunuyor.
+SETTLE_QUIET_ABSOLUTE = 1.5
+SETTLE_DROP_RATIO = 0.25
+SETTLE_MIN_PEAK = 6.0
+
+# İndirmenin gerçekleştiğini tıklamanın başarısından değil, İndirilenler
+# klasörüne yeni bir dosya düşmesinden anlıyoruz.
+DOWNLOAD_TIMEOUT_SECONDS = 30.0
+_PARTIAL_SUFFIXES = (".crdownload", ".tmp", ".partial", ".part")
 
 
 def _run_vision_step(client: genai.Client, instruction: str, kind: str, text: str = "", retries: int = 2) -> dict:
@@ -128,21 +156,206 @@ def _run_vision_step(client: genai.Client, instruction: str, kind: str, text: st
     return {"success": False, "desc": last_desc, "reason": last_reason}
 
 
-def _download_latest_image(client: genai.Client) -> dict:
+def _downloads_dir() -> Path:
+    """Chrome'un varsayılan indirme klasörü. Gerçek konumu kayıt defterinden
+    okur (başka bir sürücüye ya da OneDrive'a yönlendirilmiş olabilir),
+    bulamazsa ev dizinindeki Downloads'a düşer."""
+    try:
+        import winreg
+
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders",
+        ) as key:
+            raw, _ = winreg.QueryValueEx(key, "{374DE290-123F-4565-9164-39C4925E467B}")
+            candidate = Path(os.path.expandvars(str(raw)))
+            if candidate.is_dir():
+                return candidate
+    except Exception:
+        pass
+    return Path.home() / "Downloads"
+
+
+def _downloads_snapshot(folder: Path) -> set[str]:
+    try:
+        return {p.name for p in folder.iterdir() if p.is_file()}
+    except Exception:
+        return set()
+
+
+def _wait_for_new_download(
+    folder: Path, before: set[str], timeout: float = DOWNLOAD_TIMEOUT_SECONDS
+) -> tuple[bool, str]:
+    """İndirilenler klasörüne yeni ve YAZILMASI BİTMİŞ bir dosya düşene kadar
+    bekler; (başarı, dosya_adı) döner. Kısmi indirme uzantılarını (.crdownload)
+    yok sayar ve boyut iki ölçümde aynı kalmadan tamamlanmış saymaz."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        fresh = [
+            name
+            for name in (_downloads_snapshot(folder) - before)
+            if not name.lower().endswith(_PARTIAL_SUFFIXES)
+        ]
+        if fresh:
+            path = folder / sorted(fresh)[0]
+            try:
+                size_first = path.stat().st_size
+                time.sleep(0.6)
+                if size_first > 0 and path.stat().st_size == size_first:
+                    return True, path.name
+            except OSError:
+                pass  # dosya hâlâ yazılıyor ya da yeniden adlandırılıyor
+        time.sleep(0.5)
+    return False, ""
+
+
+def _screen_fingerprint():
+    """Ekranın küçültülmüş gri tonlamalı parmak izi. Tamamen yerel — Gemini
+    çağrısı yapmaz. Yakaladığı geçici dosyayı kendisi siler."""
+    cap_ok, result, *_rest = _capture_desktop()
+    if not cap_ok:
+        return None
+    path = Path(result)
+    try:
+        with Image.open(path) as img:
+            return img.convert("L").resize(FINGERPRINT_SIZE)
+    except Exception:
+        return None
+    finally:
+        try:
+            if path.exists():
+                path.unlink()
+        except Exception:
+            pass
+
+
+def _fingerprint_diff(first, second) -> float:
+    """İki parmak izi arasındaki ortalama mutlak fark (0-255)."""
+    if first is None or second is None:
+        return 255.0
+    try:
+        histogram = ImageChops.difference(first, second).histogram()
+        pixels = sum(histogram)
+        if not pixels:
+            return 255.0
+        return sum(value * count for value, count in enumerate(histogram)) / pixels
+    except Exception:
+        return 255.0
+
+
+def _wait_until_settled(
+    min_wait: float = GENERATION_MIN_WAIT_SECONDS,
+    max_wait: float = GENERATION_MAX_WAIT_SECONDS,
+) -> float:
+    """Ekran değişmeyi bırakana kadar bekler, beklenen saniyeyi döner.
+
+    Görsel üretilirken sayfa sürekli değişir (yükleme animasyonu, görselin
+    belirmesi); üretim bitince değişim taban gürültüsüne iner. Karar bu yüzden
+    göreli veriliyor — bkz. SETTLE_DROP_RATIO yanındaki not."""
+    started = time.time()
+    time.sleep(min_wait)
+    previous = _screen_fingerprint()
+    peak = 0.0
+    stable = 0
+
+    while time.time() - started < max_wait:
+        time.sleep(SETTLE_SAMPLE_INTERVAL)
+        current = _screen_fingerprint()
+        if current is None:
+            continue
+
+        diff = _fingerprint_diff(previous, current)
+        previous = current
+        peak = max(peak, diff)
+
+        quiet = diff < SETTLE_QUIET_ABSOLUTE
+        dropped = peak >= SETTLE_MIN_PEAK and diff <= peak * SETTLE_DROP_RATIO
+        if quiet or dropped:
+            stable += 1
+            if stable >= SETTLE_STABLE_SAMPLES:
+                break
+        else:
+            stable = 0
+
+    return time.time() - started
+
+
+def _type_at_verified(client: genai.Client, point: tuple[int, int], text: str) -> bool:
+    """Bilinen bir koordinata tıklayıp yazar, sonra sonucu vision ile doğrular.
+
+    Sohbet giriş kutusu turlar arasında yer değiştirmiyor, bu yüzden her
+    tekrarda yeniden ARAMAK gereksiz — `_locate_element` çağrısı atlanıyor ve
+    tur başına iki vision çağrısı bire iniyor.
+
+    Doğrulama adımı KALDIRILMADI: yazmanın gerçekten işe yarayıp yaramadığı
+    piksel farkıyla ölçülemez (durgun masaüstünde bile ardışık kareler
+    arasında ~34/255 gürültü ölçüldü, gerçek bir değişiklikten ayırt
+    edilemiyor). Piksel farkı yalnızca ZAMANLAMA için kullanılıyor
+    (`_wait_until_settled`); DOĞRULUK kararı vision'da kalıyor — "yazdım
+    dedi ama yazmadı" hatasının kök nedeni buydu."""
+    before_path: Path | None = None
+    after_path: Path | None = None
+    try:
+        cap_ok, result, *_rest = _capture_desktop()
+        if not cap_ok:
+            return False
+        before_path = Path(result)
+
+        try:
+            pyautogui.click(point[0], point[1])
+            time.sleep(0.2)
+            pyautogui.write(text, interval=0.02)
+            time.sleep(0.15)
+            pyautogui.press("enter")
+        except Exception:
+            return False
+
+        time.sleep(0.8)
+        cap_ok2, result2, *_rest2 = _capture_desktop()
+        if not cap_ok2:
+            return False
+        after_path = Path(result2)
+
+        try:
+            verify = _verify_action(
+                client, "Gemini sohbet giriş kutusu ('Gemini'a sorun')",
+                "type_enter", text, before_path, after_path,
+            )
+        except Exception:
+            return False
+        return bool(verify.get("verified"))
+    finally:
+        for path in (before_path, after_path):
+            if path is not None:
+                try:
+                    if path.exists():
+                        path.unlink()
+                except Exception:
+                    pass
+
+
+def _download_latest_image(client: genai.Client, downloads_dir: Path) -> dict:
     """Önce Gemini'nin görsel üzerindeki kendi indirme ikonunu dener; bulamazsa
     sağ tık -> 'Resmi kaydet' bağlam menüsüne düşer, Enter ile Chrome'un
-    varsayılan konumuna (İndirilenler) kaydeder."""
+    varsayılan konumuna (İndirilenler) kaydeder.
+
+    Başarı ölçütü TIKLAMANIN başarısı değil, klasöre yeni bir dosyanın
+    düşmesidir — eski hâli "ikona tıklayabildim" ile "görsel indi"yi aynı şey
+    sayıyor ve indirilen sayısını olduğundan fazla raporlayabiliyordu."""
+    before = _downloads_snapshot(downloads_dir)
+
     step = _run_vision_step(
         client, "sohbette en son oluşturulan görselin üzerindeki indirme (download) ikonu",
         "click", retries=1,
     )
     if step["success"]:
-        time.sleep(1.5)
-        return {"success": True}
+        arrived, name = _wait_for_new_download(downloads_dir, before)
+        if arrived:
+            return {"success": True, "file": name, "reason": ""}
 
     step2 = _run_vision_step(client, "sohbette en son oluşturulan görsel", "rightclick", retries=1)
     if not step2["success"]:
-        return {"success": False, "reason": step2["reason"]}
+        return {"success": False, "reason": step2["reason"], "file": ""}
 
     time.sleep(0.6)
     step3 = _run_vision_step(
@@ -151,12 +364,14 @@ def _download_latest_image(client: genai.Client) -> dict:
     )
     if not step3["success"]:
         pyautogui.press("esc")
-        return {"success": False, "reason": step3["reason"]}
+        return {"success": False, "reason": step3["reason"], "file": ""}
 
     time.sleep(1.2)
     pyautogui.press("enter")  # Farklı Kaydet diyaloğu -> varsayılan İndirilenler/isim
-    time.sleep(1.0)
-    return {"success": True}
+    arrived, name = _wait_for_new_download(downloads_dir, before)
+    if arrived:
+        return {"success": True, "file": name, "reason": ""}
+    return {"success": False, "reason": "İndirilenler klasöründe yeni dosya belirmedi", "file": ""}
 
 
 @register_tool("gemini_desktop_task")
@@ -269,23 +484,57 @@ def gemini_desktop_task(
     if repeat_count <= 0:
         return ok(f"Tamam, Gemini'ye '{prompt}' gönderdim.", mode=mode)
 
-    # 7) İstenirse: oluşan görseli indir, 'next' (veya verilen metni) yaz,
-    #    tekrarla. Görsel oluşturma süresi belirsiz olduğu için sabit bir
-    #    bekleme kullanıyoruz (canlı testte ayarlanması gerekebilir).
+    # 7) İstenirse: üretim bitene kadar bekle (sabit sleep değil, ekran durana
+    #    kadar), görseli indir, indiğini dosya sisteminden DOĞRULA, 'next'
+    #    (veya verilen metni) yaz, tekrarla.
+    #
+    #    Giriş kutusunun koordinatı 6. adımdan zaten biliniyor ve turlar
+    #    arasında yer değiştirmiyor — her tekrarda yeniden aratmak yerine
+    #    yeniden kullanılıyor (tur başına iki vision çağrısı yerine bir).
+    #    Kayarsa doğrulama adımı yakalar ve tam vision adımına düşülür.
+    downloads_dir = _downloads_dir()
+    input_point: tuple[int, int] | None = None
+    if step.get("x") is not None and step.get("y") is not None:
+        input_point = (int(step["x"]), int(step["y"]))
+
     downloaded = 0
+    files: list[str] = []
+    failures: list[str] = []
+
     for i in range(repeat_count):
-        time.sleep(IMAGE_GENERATION_WAIT_SECONDS)
-        dl = _download_latest_image(client)
+        _wait_until_settled()
+
+        dl = _download_latest_image(client, downloads_dir)
         if dl["success"]:
             downloaded += 1
+            files.append(dl["file"])
+        else:
+            failures.append(f"{i + 1}. tur: {dl['reason'] or 'bilinmeyen sebep'}")
 
         if i < repeat_count - 1:
-            step = _run_vision_step(client, "Gemini sohbet giriş kutusu ('Gemini'a sorun')", "type_enter", text=repeat_text)
-            if not step["success"]:
-                return fail(
-                    f"{i + 1}. tekrarda '{repeat_text}' yazılamadı: {step['reason']} "
-                    f"(o ana kadar {downloaded} görsel indirildi).",
-                    downloaded=downloaded,
-                )
+            sent = input_point is not None and _type_at_verified(client, input_point, repeat_text)
 
-    return ok(f"Tamam, işlemi tamamladım — {downloaded}/{repeat_count} görsel indirildi.", downloaded=downloaded)
+            if not sent:
+                step_next = _run_vision_step(
+                    client, "Gemini sohbet giriş kutusu ('Gemini'a sorun')",
+                    "type_enter", text=repeat_text,
+                )
+                if not step_next["success"]:
+                    return fail(
+                        f"{i + 1}. tekrarda '{repeat_text}' yazılamadı: {step_next['reason']} "
+                        f"(o ana kadar {downloaded} görsel indirildi).",
+                        downloaded=downloaded, files=files,
+                    )
+                if step_next.get("x") is not None and step_next.get("y") is not None:
+                    input_point = (int(step_next["x"]), int(step_next["y"]))
+
+    if downloaded == repeat_count:
+        return ok(
+            f"Tamam, işlemi tamamladım — {downloaded}/{repeat_count} görsel indirildi.",
+            downloaded=downloaded, files=files,
+        )
+    return ok(
+        f"İşlem bitti ama {repeat_count} turun {downloaded} tanesinde görsel indi. "
+        f"Sorunlar: {'; '.join(failures[:3])}",
+        downloaded=downloaded, files=files, failures=failures,
+    )
