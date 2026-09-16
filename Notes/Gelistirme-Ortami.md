@@ -81,3 +81,65 @@ Ajanları kaldırmak: `~/.claude/agents` içinden ilgili `.md` dosyalarını sil
 
 Yeni ajanlar oturum başında yüklenir — kurulumdan sonra Claude Code'un yeniden
 başlatılması gerekir.
+
+---
+
+# Süreklilik hook'ları (2026-08-21)
+
+`CLAUDE.md` en baştan "iş bitince kasayı güncelle" diyordu ama bunu hiçbir şey
+zorlamıyordu — kural bir **talimattı**, unutulunca kimse fark etmiyordu. Üç hook
+onu **mekanizmaya** çevirdi.
+
+Kaynak fikir: [avenoxbeyin](https://github.com/avenoxai/avenoxbeyin) (MIT).
+Oradaki bash betikleri değil, yaklaşımı alındı.
+
+| Hook | Olay | Ne yapar |
+|---|---|---|
+| `session_start.py` | `SessionStart` | `Docs/Son-Oturum.md`'nin en üstteki bloğunu ve `Docs/Acik-Konular.md`'deki açık maddeleri `additionalContext` olarak enjekte eder |
+| `prompt_counter.py` | `UserPromptSubmit` | 15. promptta **bir kez** kasa hatırlatması |
+| `session_end.py` | `SessionEnd` | Oturum 5+ prompt sürdüyse ve `Son-Oturum.md`'ye dokunulmadıysa `.state/needs_reflection` bırakır |
+
+Yaptırım `session_end`'de değil, **bir sonraki** `session_start`'ta: oturum bittiği
+anda uyarı basmanın kimseye faydası yok, o yüzden iz bırakılıp açılışta okunuyor.
+
+## Neden bash değil Python
+
+avenoxbeyin macOS varsayıyor; iki yeri doğrudan kırılıyordu:
+
+- `stat -f %m` **BSD** sözdizimi. Windows/Git Bash'te `stat -c %Y` gerekir —
+  taşınabilir karşılığı `Path.stat().st_mtime`.
+- `python3` bu makinede **yok**, yalnızca `python` var (3.11.15).
+
+Üstüne, Türkçe metni bash + `sed` + cmd kod sayfası zincirinden geçirmek
+karakterleri bozuyor. Python `encoding="utf-8"` ile ikisini de çözüyor.
+Stdlib dışında bağımlılık yok; ortak yardımcılar `_ortak.py`'de.
+
+## Tuzak: settings.json'da göreli yol
+
+Komutlar `python .claude/hooks/session_start.py` — **mutlak yol değil**.
+İki sebep:
+
+1. Kasanın mutlak yolu `Ders Notları\Aıron` — içinde `ı` ve boşluk var. cmd'nin
+   kod sayfasından geçerken bozulma riski. Göreli yol saf ASCII.
+2. `$CLAUDE_PROJECT_DIR` Windows kabuğunda genişlemez (`%VAR%` bekler); göreli
+   yol her kabukta aynı çalışır.
+
+Karşılığı: hook'lar yalnızca Claude Code **proje kökünde** açıldığında çalışır.
+Zaten kullanım şekli bu.
+
+## Biçim sözleşmesi
+
+Parser başlıklara bakıyor, bozulursa enjeksiyon sessizce boşalır:
+
+- `Son-Oturum.md` → `## Oturum:` satırından `## Önceki` satırına kadar
+- `Acik-Konular.md` → `## Açık`'tan `## Kapanmış`'a, yalnızca `###` başlıkları
+  ve `**Durum:**` satırları
+
+Her hook `try/except` içinde ve daima `exit 0` — bir hook hatası oturumu asla
+bloklamaz.
+
+## Sürüm kontrolü
+
+`.claude/` `.gitignore`'da (satır 6), yani hook'lar **commit edilmiyor** —
+kişisel araç. `Docs/Son-Oturum.md` ve `Docs/Acik-Konular.md` ise izleniyor.
+Yeni makinede kurulum: bu üç betiği ve `settings.json`'ı yeniden yazmak gerekir.

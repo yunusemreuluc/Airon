@@ -48,7 +48,6 @@ _user32.AttachThreadInput.restype = wintypes.BOOL
 _kernel32.GetCurrentThreadId.restype = wintypes.DWORD
 
 
-AUTO_SEND_DELAY_SECONDS = 2.4
 # WhatsApp penceresinin açılıp aktif hale gelmesi için azami bekleme süresi.
 # Cold start (uygulama kapalıyken ilk açılış) ölçümde ~5sn sürdüğü görüldü,
 # bu yüzden sabit sleep yerine _wait_for_whatsapp_window() ile pencere gerçekten
@@ -57,7 +56,6 @@ DESKTOP_LOAD_DELAY = 10.0
 WEB_LOAD_DELAY = 6.5
 BASE_DIR = Path(__file__).resolve().parent.parent
 PHONEBOOK_FILE = BASE_DIR / "memory" / "phone_book.json"
-PREFERRED_BROWSERS = ["chrome", "msedge", "firefox"]
 
 
 def _normalize_phone(phone_number: str) -> str:
@@ -100,14 +98,6 @@ def _load_phone_book() -> dict:
     except Exception:
         pass
     return {}
-
-
-def _save_phone_book(phone_book: dict):
-    PHONEBOOK_FILE.parent.mkdir(parents=True, exist_ok=True)
-    PHONEBOOK_FILE.write_text(
-        json.dumps(phone_book, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
 
 
 def _contact_candidates() -> list[dict]:
@@ -506,93 +496,3 @@ def send_whatsapp_message(
             "Enter'a basarak gönderebilirsin.",
             recipient=label,
         )
-
-
-# ── vCard (.vcf) rehber içe aktarma ──────────────────────────────────────────
-# macOS sürümüyle aynı: telefon rehberini (.vcf) toplu olarak kalıcı belleğe alır.
-
-def _unfold_vcf_lines(text: str) -> list[str]:
-    unfolded = []
-    for raw_line in text.splitlines():
-        line = raw_line.rstrip("\r\n")
-        if line.startswith((" ", "\t")) and unfolded:
-            unfolded[-1] += line[1:]
-        else:
-            unfolded.append(line)
-    return unfolded
-
-
-def import_phone_book_from_vcf(vcf_path: str) -> str:
-    source = Path(vcf_path).expanduser()
-    if not source.exists():
-        return f"Rehber dosyası bulunamadı: {source}"
-
-    try:
-        text = source.read_text(encoding="utf-8", errors="ignore")
-    except Exception as exc:
-        return f"Rehber dosyası okunamadı: {exc}"
-
-    entries = {}
-    current_lines = []
-    imported = 0
-    skipped = 0
-
-    def _flush_card(lines: list[str]):
-        nonlocal imported, skipped
-        if not lines:
-            return
-        display_name = ""
-        aliases = []
-        numbers = []
-        for line in lines:
-            upper = line.upper()
-            if upper.startswith("FN:"):
-                display_name = line.split(":", 1)[1].strip()
-            elif upper.startswith("N:") and not display_name:
-                parts = [part.strip() for part in line.split(":", 1)[1].split(";") if part.strip()]
-                if parts:
-                    display_name = " ".join(reversed(parts[:2])).strip()
-            elif "TEL" in upper and ":" in line:
-                number = line.split(":", 1)[1].strip()
-                if number:
-                    numbers.append(number)
-
-        if not display_name or not numbers:
-            skipped += 1
-            return
-
-        normalized_numbers = []
-        for raw_number in numbers:
-            try:
-                normalized_numbers.append("+" + _normalize_phone(raw_number))
-            except ValueError:
-                continue
-        if not normalized_numbers:
-            skipped += 1
-            return
-
-        if " " in display_name:
-            aliases.extend(part for part in display_name.split() if len(part) > 1)
-        key = _contact_key(display_name)
-        entries[key] = {
-            "display_name": display_name,
-            "value": normalized_numbers[0],
-            "numbers": normalized_numbers,
-            "aliases": sorted({alias for alias in aliases if _normalize_lookup(alias) != _normalize_lookup(display_name)}),
-            "source": "vcf_import",
-        }
-        imported += 1
-
-    for line in _unfold_vcf_lines(text):
-        if line.upper() == "BEGIN:VCARD":
-            current_lines = []
-        elif line.upper() == "END:VCARD":
-            _flush_card(current_lines)
-            current_lines = []
-        else:
-            current_lines.append(line)
-
-    phone_book = _load_phone_book()
-    phone_book.update(entries)
-    _save_phone_book(phone_book)
-    return f"{imported} rehber kişisi içe aktarıldı, {skipped} kayıt atlandı."

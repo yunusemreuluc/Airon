@@ -85,33 +85,3 @@ export const ENERGY_CORE_VERTEX_SHADER = /* glsl */ `
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
-
-export const ENERGY_CORE_FRAGMENT_SHADER = /* glsl */ `
-  uniform vec3 uColorA;
-  uniform vec3 uColorB;
-  uniform vec3 uRimColor;
-  uniform float uIntensity;
-  varying vec3 vNormal;
-  varying vec3 vViewPosition;
-  varying float vNoise;
-
-  void main() {
-    vec3 viewDir = normalize(vViewPosition);
-    float fresnel = pow(1.0 - max(dot(normalize(vNormal), viewDir), 0.0), 2.2);
-
-    // Gövde: iki mavi ton arasında gürültüyle karışan derinlik.
-    vec3 base = mix(uColorA, uColorB, smoothstep(-1.0, 1.0, vNoise));
-
-    // Kenar: kullanıcı isteğiyle (2026-07-28) eklendi — fresnel kenarı gövdeyle
-    // aynı rengin parlağı değil, AYRI bir platin tonu. Kürenin silüeti mavi
-    // gövdeden keskince ayrılıyor; "boyanmış top" yerine ışık yayan bir cisim
-    // gibi okunuyor (metal + iç ışık ayrımı).
-    vec3 tinted = mix(base, uRimColor, fresnel * 0.75);
-
-    // Çarpanlar bilerek düşük — bloom (PostProcessing.tsx) üstüne binerken
-    // beyaza kırpılmayı önlüyor.
-    vec3 glow = tinted * (0.2 + fresnel * 1.05) * uIntensity;
-
-    gl_FragColor = vec4(glow, 1.0);
-  }
-`;

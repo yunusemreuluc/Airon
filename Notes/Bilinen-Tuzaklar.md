@@ -29,6 +29,26 @@ durum değeri sessizce yutulur ve sahne eski hâlinde donar — hata yok, log yo
 sadece "hiçbir şey olmuyor". Yeni durum eklerken `core/web_ui.py` `STATE_MAP`
 ile bu kümenin **aynı** kalması şart (2026-07-31, beş tepki çalışması).
 
+## Kalıcı durum bayrağı sonradan bağlanana GİTMEZ
+
+`assistant_status` (muted/paused/remote) yalnızca DEĞİŞTİĞİ an yayınlanıyordu.
+Telefondan uzak mod açıldıktan sonra açılan PC penceresi bayrağı hiç öğrenmedi,
+dock "uzak mod" göstermedi ve Aıron sebepsiz susmuş gibi göründü (2026-09-15,
+görsel testte yakalandı). Artık `backend/websocket/router.py` her yeni bağlantıya
+o anki durumu ilk mesaj olarak yolluyor.
+
+**Kural:** olay olarak yayınlanan her KALICI durum (anlık olay değil), yeni
+bağlanan istemciye bir anlık görüntü olarak da verilmeli.
+
+## Katmansız CSS sınıfı Tailwind yardımcısını ezer
+
+`.glass-panel`, `.surface-card`, `.label-micro` `globals.css`'te hiçbir
+`@layer` içinde değil; Tailwind v4 yardımcıları ise `@layer utilities` içinde.
+Katmansız kural HER ZAMAN kazanıyor: `surface-card rounded-[20px]` 18px kalıyor,
+`label-micro text-primary` gri kalıyor. Hata yok, sadece etkisiz sınıf.
+Telefon arayüzünde bu yüzden köşe yarıçapı ve etiket rengi satır içi `style`
+(2026-09-15).
+
 ## framer-motion opacity'yi satır içi yazar
 
 `opacity-0` Tailwind sınıfı onu **ezemez** — satır içi stil her zaman kazanır.
@@ -158,8 +178,8 @@ Bunlar SADECE bakarak yakalandı:
 ## Arayüzü nasıl test ediyoruz
 
 **Tercih edilen yol (2026-07-31): sahte backend, sahte soket değil.** Statik
-export'u FastAPI ile **8000 portundan** sun (frontend `ws://localhost:8000/ws`
-adresini sabit yazıyor), gerçek bir `@app.websocket("/ws")` aç ve olayları
+export'u FastAPI ile **8000 portundan** sun (WS adresi 2026-09-15'ten beri sayfanın
+kendi kaynağından türetiliyor, ama `/api/*` ile aynı kaynakta olmalı), gerçek bir `@app.websocket("/ws")` aç ve olayları
 oradan yayınla. Sayfa gerçek soketle konuştuğu için `VALID_STATES` gibi
 arayüz tarafı filtreler de test edilmiş oluyor.
 

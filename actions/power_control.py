@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import subprocess
 
-VALID_ACTIONS = {"shutdown", "restart", "sleep", "hibernate"}
-
 
 def execute_power_action(action: str) -> None:
     """Eylemi HEMEN çalıştırır. Başarısız olursa exception fırlatır — çağıran

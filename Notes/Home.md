@@ -18,6 +18,13 @@ Not bir kaynağı özetliyorsa dosya:satır referansı verir — detay gerekirse
 - [[Bilinen-Tuzaklar]] — zamana mal olmuş tuzaklar, arayüzde dürüstlük, nasıl doğrulanır
 - [[Yerel-Model]] — Ollama denendi ve **kaldırıldı**; ölçümler duruyor (num_ctx, Türkçe, VRAM)
 - `CLAUDE.md` — yalın karar kitabı: Obsidian-önce iş akışı, rol, performans hedefi
+- `Docs/Son-Oturum.md` + `Docs/Acik-Konular.md` — oturumlar arası süreklilik;
+  `.claude/hooks/` üçlüsü ilkini açılışta context'e enjekte eder, kasa
+  güncellenmeden biten oturumu işaretler ([[Gelistirme-Ortami]] § Süreklilik)
+- [[Airon-Mobil]] — telefondaki Aıron (Kotlin, `Projects/airon-mobile`): Gemini Live,
+  arama/WhatsApp/cihaz araçları, PC köprüsü (`/api/remote/ask|desktop|note`)
+- [[Uzaktan-Erisim]] — telefondan Aıron: Tailscale + PIN kapısı (`backend/core/remote_auth.py`),
+  uzak mod (PC sessiz), telefon arayüzü `frontend/app/m`, kurulum adımları
 - [[Kurulum-ve-Baslatma]] — kurulum ve çalıştırma: requirements.txt, AIRON.bat, make_shortcut.py,
   bellek profili; ayrıca `desktop.py` (WebView2 penceresi), `frontend/` (Next.js + Three.js) ve
   `core/web_ui.py` (ses döngüsü ↔ arayüz adaptörü)
@@ -74,6 +81,37 @@ boş dönüyordu, arayüz hiçbirini çağırmıyordu), hiçbir yerden import ed
 ayıklama artığı (`logs/airon_ses_ornegi.pcm`) silindi. Aynı turda beş servis
 dosyasındaki tekrar `frontend/services/apiClient.ts` altında toplandı
 ([[Arayuz]] § Veri akışı).
+
+Üçüncü tur 2026-08-21'de yapıldı — **212 + 98 = 310 satır** gitti:
+`actions/weather.py`'nin yarısından fazlası (`get_weather_forecast` + WMO kod
+tablosu, [[Weather]]), `actions/whatsapp.py`'deki vCard içe aktarma
+([[WhatsApp]]), `main.py._interrupt_audio` (sözünü kesme yardımcısı, hiç
+çağrılmadı), `ENERGY_CORE_FRAGMENT_SHADER` (`EnergyCore.tsx` yalnızca VERTEX
+shader'ı alıyor), `_spotify_installed`, `VALID_ACTIONS`, `has_gemini_api_key`
+([[Bellek-ve-Config]]), `measure_distinctiveness`, `registered_tool_names`,
+`AUTO_SEND_DELAY_SECONDS`, `PREFERRED_BROWSERS`, üç kullanılmayan import ve
+gereksiz `frontend/layouts/.gitkeep` (klasörde zaten `AppShell.tsx` var).
+
+**Bu turun dersi — docstring bir kanıt değil.** `get_weather_forecast` "ana
+UI'daki hava durumu panelinin gün-gün gezinme özelliği için kullanılıyor"
+diyordu; öyle bir panel hiç olmadı. `_WMO_CODES` tablosunun yorumu ise
+Tkinter'ın emoji render sorununu anlatıyordu — yani metin, silineli bir yıl
+olmuş bir arayüzü tarif ediyordu. Kodun kendisi hakkında yazdığı şey değil,
+**çağıranı** aranmalı.
+
+**Ölü sanılıp bırakılanlar** (silmek ölçüsüz olurdu, ikisi de kayıt altında):
+- `frontend/services/voiceApi.ts` → `setPaused` — zincirin tamamı hazır
+  (`backend/api/voice.py` → `core/web_ui.py` → `main.py._paused`, beş kullanım),
+  eksik olan yalnızca kullanıcının basacağı düğme. `Docs/AIRON_UI_ROADMAP.md`
+  § Küçük artıklar'da açıkça bekleyen iş olarak duruyor — yani kural gereği
+  "ölü" görünen bir satır, yol haritasında iş varsa **canlıdır**.
+- `Fonts/` — üç Grift `.ttf`, koda bağlı değil; kullanıcı kararıyla marka fontu
+  olarak bırakıldı ([[Kurulum-ve-Baslatma]] § Varlıklar).
+
+vCard silinirken `_save_phone_book` de gitti (tek çağıranı oydu) ama
+`_load_phone_book` **duruyor**: `memory/phone_book.json` elle doldurulursa
+kişi araması hâlâ okuyor. Ölü kodu keserken canlı okuma yolunu kesmemek için
+yazan/okuyan ayrımı tek tek kontrol edildi.
 
 **Denetimin nasıl yapıldığı önemli:** `@register_tool` ile kaydedilen araçlar
 `main.py`'de İSİMLE hiç çağrılmıyor — import'un tek amacı dekoratörü

@@ -26,9 +26,38 @@ Read before touching an unfamiliar area.
 
 `Docs/AIRON_UI_ROADMAP.md` - remaining UI work.
 
+`Docs/Son-Oturum.md` - the bridge between sessions. What happened last time
+and where it was left off.
+
+`Docs/Acik-Konular.md` - work that spans sessions. YAPILACAKLAR.md holds what
+is planned; this holds what is mid-flight.
+
+## Continuity
+
+Three hooks in `.claude/hooks/` enforce the memory loop - they are the
+mechanism behind the rule below, not a substitute for it.
+
+`session_start.py` - injects the top block of `Docs/Son-Oturum.md` and the
+open items of `Docs/Acik-Konular.md` before the first prompt.
+
+`prompt_counter.py` - one reminder at prompt 15.
+
+`session_end.py` - if a session ran 5+ prompts without `Son-Oturum.md` being
+touched, it leaves a marker; the next session opens with a warning.
+
+Both files are parsed by heading. `Son-Oturum.md` is read from `## Oturum:`
+to `## Onceki`; `Acik-Konular.md` from `## Acik` to `## Kapanmis`, keeping
+only `###` titles and `**Durum:**` lines. Keep the shape when editing.
+
+Python, not bash - `python3` does not exist on this machine and macOS-only
+`stat -f %m` would break. Stdlib only, no dependency added.
+
 ## After finishing any work
 
 Update the vault in the same turn - write the notes directly.
+
+That includes `Docs/Son-Oturum.md` (rewrite the top block, push the old
+one down) and `Docs/Acik-Konular.md` if a thread opened or closed.
 
 Do NOT report the vault changes back in the reply.
 The user asked for this explicitly (2026-08-01): no

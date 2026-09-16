@@ -12,7 +12,12 @@ Bağlı: [[Home]] · [[Mimari]] · [[Arac-Tanimlari]] · [[WhatsApp]]
 - `load_app_config()` — dosyayı okur, eksik alanları default ile doldurur
 - `save_app_config(updates)` — merge edip yazar
 - `get_app_config_value(key, default)` — tek değer okuma (çoğu `actions/*.py` bunu kullanır)
-- `has_gemini_api_key()` — UI'nin "API anahtarı gir" ekranını göstermesi için
+
+`has_gemini_api_key()` 2026-08-21'de silindi — hiçbir yerden çağrılmıyordu.
+Anahtarın varlığını gerçekte `backend/api/settings.py` kendi içinde ölçüyor
+(`bool(str(config.get("gemini_api_key") or "").strip())`, satır ~51); elindeki
+`config` sözlüğünü kullandığı için yardımcıyı çağırsa dosyayı ikinci kez okumuş
+olurdu. Yani ortada tekrar değil, **ölü bir kopya** vardı.
 
 `config/api_keys.example.json` şablon, gerçek dosya `config/api_keys.json` git'e girmemeli
 (kişisel anahtar içerir).

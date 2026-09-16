@@ -153,11 +153,19 @@ olduğu için cevap **sesli** geliyor.
 |---|---|
 | `Icon/` | `airon.ico` (10 boyutlu), `airon.png`, `airon-tray.png` — hepsi `make_icon.py` ile üretiliyor |
 | `SFX/` | `Start` (açılış), `Done` (araç başarısı), `Error` (hata), `HUD` (uyku/uyanma, tepsi), `Think` (düşünme döngüsü) |
-| `Fonts/` | Grift ailesi (.ttf) |
+| `Fonts/` | Grift ailesi (.ttf) — **hiçbir yerden çağrılmıyor**, bkz. aşağısı |
 
 **Sesleri artık tarayıcı çalıyor**, Python değil: `backend/main.py` `SFX/`
 klasörünü `/sfx` altında sunuyor, `frontend/services/sfxPlayer.ts` çalıyor.
 Beş dosyanın beşi de bağlı.
+
+`Icon/` üçü de bağlı (`desktop.py`, `make_shortcut.py`, tepsi). `Fonts/` **değil**:
+üç Grift `.ttf`'ine kodda tek atıf yok — silinen Tkinter arayüzünden kalma, web
+arayüzü Inter kullanıyor (`next/font`). 2026-08-21 temizliğinde tespit edildi,
+kullanıcı kararıyla **bilerek bırakıldı** (marka fontu olarak ileride web UI'ye
+bağlanabilir). Yani bu, kasadaki "import edilmiyorsa yaşamıyordur" kuralının
+bilinen tek istisnası — ölü kod ararken tekrar tespit edilirse yeniden tartışma,
+karar verilmiş.
 
 **Kritik ayrıntı:** Chromium kullanıcı sayfaya dokunmadan ses çalmayı engeller,
 bu yüzden açılış sesi hiç duyulmuyordu. `desktop.py` en üstte

@@ -55,10 +55,14 @@ bu arama sadece "hiç kayıt yokken de bir şekilde çalışsın" isteği için 
 ## save_whatsapp_contact(display_name, phone_number, aliases)
 `memory.json`'a `whatsapp_contacts/<key>` olarak kaydeder.
 
-## vCard içe aktarma — import_phone_book_from_vcf(vcf_path)
-`.vcf` dosyasını satır satır parse eder (`FN:`, `N:`, `TEL` alanları), `phone_book.json`'a yazar.
-Bu fonksiyon projede hiçbir yerden çağrılmıyor (`tool_defs.py`'de tool tanımı yok, `main.py`/`ui.py`
-içinde de import edilmiyor) — OKU_BENI.txt'de bahsedilen "kişi/rehber (.vcf) içe aktarma" özelliği
-şu an UI'ye bağlanmamış, sadece fonksiyon olarak duruyor.
+## vCard içe aktarma — KALDIRILDI (2026-08-21)
+`import_phone_book_from_vcf` + `_unfold_vcf_lines` + `_save_phone_book` (98 satır) ve
+`memory/phone_book.example.json` silindi. Hiçbir yerden çağrılmıyordu: tool tanımı yoktu,
+UI'ye bağlı değildi, macOS sürümünden kalmaydı.
+
+`memory/phone_book.json` **okunmaya devam ediyor** — `_load_phone_book()` duruyor ve
+`_contact_candidates()` hâlâ `whatsapp_contacts` yanında `phone_book` kaynağını da tarıyor.
+Değişen tek şey: dosyayı artık kod yazmıyor. Elle `{"kisi": {"phone": "+90..."}}` biçiminde
+doldurulursa aynen çalışır. Parse'ı geri isteyen olursa `git log -S import_phone_book_from_vcf`.
 
 Tool'lar: `send_whatsapp_message`, `save_whatsapp_contact` ([[Arac-Tanimlari]]).

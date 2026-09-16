@@ -55,8 +55,3 @@ def save_app_config(updates: dict) -> dict:
 
 def get_app_config_value(key: str, default=None):
     return load_app_config().get(key, default)
-
-
-def has_gemini_api_key() -> bool:
-    value = str(get_app_config_value("gemini_api_key", "") or "").strip()
-    return bool(value)

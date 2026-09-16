@@ -37,13 +37,6 @@ def _copy_to_clipboard(text: str) -> tuple[bool, str]:
         return False, f"Panoya kopyalanamadı: {exc}"
 
 
-def _spotify_installed() -> bool:
-    import shutil
-    return shutil.which("Spotify") is not None or subprocess.run(
-        "where Spotify", shell=True, capture_output=True
-    ).returncode == 0
-
-
 def _play_youtube(query: str) -> dict:
     return browser_control("play_youtube", query=query)
 

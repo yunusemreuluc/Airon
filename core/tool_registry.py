@@ -38,10 +38,6 @@ def get_tool(name: str) -> Callable[..., Any] | None:
     return _REGISTRY.get(name)
 
 
-def registered_tool_names() -> list[str]:
-    return sorted(_REGISTRY.keys())
-
-
 def _annotation_kind(annotation: Any) -> str:
     """Tip anotasyonunu kaba bir 'bool | int | float | str | any' sınıfına
     indirger. `str | None` / `Optional[str]` gibi union'ları da (get_origin/

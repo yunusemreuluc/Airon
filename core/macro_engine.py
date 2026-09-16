@@ -124,14 +124,6 @@ def load_template(path: Path):
     return img, ""
 
 
-def measure_distinctiveness(path: Path) -> float:
-    """Şablon ne kadar ayırt edici (standart sapma). Düşükse yanlış tıklar."""
-    img, err = load_template(path)
-    if img is None:
-        return 0.0
-    return round(float(np.std(img)), 1)
-
-
 class MacroEngine:
     """Tek örnek (singleton) — aynı anda iki makro çalışmamalı, ikisi de aynı
     fareyi kullanır ve birbirinin tıklamasını bozar."""

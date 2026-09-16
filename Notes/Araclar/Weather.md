@@ -49,14 +49,21 @@ olurdu — okunur ad `wttr.in` cevabındaki `nearest_area`dan alınıyor.
 koordinatı olduğu gibi geri yankılıyor, ad çözmüyor. Ad yalnızca `j1` cevabının
 içinde geliyor.
 
-## İki uç
+## Tek uç
 
-- `get_weather_summary(location=None)` → `wttr.in/{konum}?format=j1`. Anlık
-  durum: sıcaklık, tanım, hissedilen, nem.
-- `get_weather_forecast(location=None, days=5)` → Open-Meteo. wttr.in'in
-  ücretsiz sürümü 3 gün veriyor, 5+ gün için Open-Meteo'ya geçildi.
-  Gerçek konum kullanıldığında koordinat zaten elde olduğu için **coğrafi
-  kodlama adımı atlanıyor** — bir ağ isteği ve bir hata kaynağı eksiliyor.
+`get_weather_summary(location=None)` → `wttr.in/{konum}?format=j1`. Anlık
+durum: sıcaklık, tanım, hissedilen, nem.
+
+**Kaldırıldı (2026-08-21):** `get_weather_forecast` + WMO kod tablosu
+(`_WMO_CODES`, `_wmo_lookup`, `_TR_WEEKDAYS`) — 137 satır, dosyanın yarısından
+fazlası. Open-Meteo'ya çok günlük tahmin için geçilmişti ve docstring'i "ana
+UI'daki hava durumu panelinin gün-gün gezinme özelliği için kullanılıyor"
+diyordu; öyle bir panel **hiç olmadı**. Kod tablosunun yorumu da Tkinter'ın
+emoji render sorununu anlatıyordu — yani blok, 2026-07-29'da silinen Tkinter
+arayüzünden kalmaydı. Tahmin gerekirse Open-Meteo çağrısı git geçmişinde
+(`git log -S get_weather_forecast`). Bu, [[Bilinen-Tuzaklar]] § arayüzde
+dürüstlük kuralının kod tarafındaki karşılığı: **docstring'in "kullanılıyor"
+demesi kullanıldığı anlamına gelmiyor**, çağıran aranmalı.
 
 ## Gizlilik
 
