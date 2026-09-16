@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LuCheck, LuExternalLink, LuKeyRound, LuVolume2 } from 'react-icons/lu';
+import { LuCheck, LuExternalLink, LuKeyRound, LuSmartphone, LuVolume2 } from 'react-icons/lu';
 import {
   createDesktopShortcut,
   fetchSettings,
@@ -10,6 +10,7 @@ import {
   type Settings,
 } from '@/services/settingsApi';
 import { configureSfx, playSfx } from '@/services/sfxPlayer';
+import { fetchRemoteConfig, saveRemotePin, type RemoteConfig } from '@/services/remoteApi';
 
 // Tkinter penceresindeki ayar paneli (API AYARLARI / SFX ON / FX LEVEL / VOICE /
 // AÇILIŞTA BAŞLAT / MASAÜSTÜNE KISAYOL / tepsiye al) kullanıcı isteğiyle
@@ -19,6 +20,8 @@ export function SettingsPanelContent() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [apiKeyDraft, setApiKeyDraft] = useState('');
   const [notice, setNotice] = useState('');
+  const [remoteConfig, setRemoteConfig] = useState<RemoteConfig | null>(null);
+  const [pinDraft, setPinDraft] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -26,6 +29,9 @@ export function SettingsPanelContent() {
       if (cancelled || !data) return;
       setSettings(data);
       configureSfx({ enabled: data.sfxEnabled, volume: data.sfxVolume });
+    });
+    void fetchRemoteConfig().then((data) => {
+      if (!cancelled && data) setRemoteConfig(data);
     });
     return () => {
       cancelled = true;
@@ -78,6 +84,51 @@ export function SettingsPanelContent() {
           </SmallButton>
         </div>
       </Section>
+
+      {/* Uzaktan erişim (2026-09-15) — telefondan girişte sorulan PIN. Yalnızca
+          burada, PC'de değiştirilebilir (bkz. backend/api/remote.py). Tailscale
+          kurulumu Notes/Uzaktan-Erisim.md içinde. */}
+      {remoteConfig && (
+        <Section title="Uzaktan erişim">
+          <span className="text-foreground-secondary flex items-center gap-2 text-xs">
+            <LuSmartphone
+              size={13}
+              strokeWidth={1.7}
+              className={remoteConfig.pinSet ? 'text-primary' : ''}
+            />
+            {remoteConfig.pinSet ? 'Telefon PIN’i ayarlı' : 'PIN yok — telefon girişi kapalı'}
+          </span>
+          <div className="flex items-center gap-2">
+            <input
+              type="password"
+              inputMode="numeric"
+              value={pinDraft}
+              onChange={(event) =>
+                setPinDraft(event.target.value.replace(/\D/g, '').slice(0, remoteConfig.maxPinLength))
+              }
+              placeholder={
+                remoteConfig.pinSet
+                  ? 'Yeni PIN...'
+                  : `${remoteConfig.minPinLength}-${remoteConfig.maxPinLength} haneli PIN`
+              }
+              className="border-border-subtle text-foreground placeholder:text-foreground-disabled focus-visible:border-primary/50 min-w-0 flex-1 rounded-full border bg-white/[0.04] px-3.5 py-2 text-xs transition-colors duration-200"
+            />
+            <SmallButton
+              disabled={pinDraft.length < remoteConfig.minPinLength}
+              onClick={async () => {
+                const result = await saveRemotePin(pinDraft);
+                setNotice(result.message);
+                if (result.success) {
+                  setPinDraft('');
+                  setRemoteConfig((current) => (current ? { ...current, pinSet: true } : current));
+                }
+              }}
+            >
+              <LuCheck size={13} strokeWidth={2} />
+            </SmallButton>
+          </div>
+        </Section>
+      )}
 
       <Section title="Ses">
         <div className="grid grid-cols-3 gap-1.5">

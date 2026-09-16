@@ -16,6 +16,18 @@ export function apiBase(): string {
   return window.location.port === '3000' ? DEV_BACKEND_ORIGIN : '';
 }
 
+// Adres sayfanın kendi kaynağından türetiliyor (2026-09-15): önceden
+// `ws://localhost:8000/ws` sabitti ve arayüz başka bir adresten (telefon,
+// Tailscale HTTPS) açıldığında soket hiç bağlanamıyordu. `npm run dev`'de arayüz
+// 3000'de, backend 8000'de — orada mutlak adres şart (bkz. services/apiClient.ts).
+export function websocketUrl(): string {
+  if (typeof window === 'undefined' || window.location.port === '3000') {
+    return 'ws://localhost:8000/ws';
+  }
+  const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${scheme}://${window.location.host}/ws`;
+}
+
 /** Backend'in her uçta döndürdüğü zarf (bkz. backend/api/*.py). */
 export interface ApiResult<T = Record<string, unknown>> {
   success: boolean;

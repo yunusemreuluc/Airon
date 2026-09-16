@@ -285,7 +285,35 @@ def build() -> Path:
     if FAVICON_PATH.parent.is_dir():
         shutil.copyfile(ico_path, FAVICON_PATH)
 
+    if REMOTE_ICON_DIR.parent.is_dir():
+        _build_remote_icons(large_master)
+
     return ico_path
+
+
+# Telefon arayüzünün ana ekran ikonları (2026-09-15, bkz. frontend/app/m ve
+# Notes/Uzaktan-Erisim.md). Şeffaf değil, zemin rengine basılı: iOS şeffaf
+# ikonu siyaha, bazı Android başlatıcıları beyaza boyuyor. "maskable" varyantta
+# çizim küçük tutuluyor — başlatıcı ikonu daireye/damlaya kırpıyor ve güvenli
+# alan ortadaki %80.
+REMOTE_ICON_DIR = BASE_DIR / "frontend" / "public" / "m" / "icons"
+REMOTE_BACKGROUND = (5, 7, 12, 255)  # globals.css --background
+
+
+def _build_remote_icons(master: Image.Image) -> None:
+    REMOTE_ICON_DIR.mkdir(parents=True, exist_ok=True)
+
+    def on_background(size: int, scale: float) -> Image.Image:
+        canvas = Image.new("RGBA", (size, size), REMOTE_BACKGROUND)
+        inner = int(size * scale)
+        offset = (size - inner) // 2
+        canvas.alpha_composite(master.resize((inner, inner), Image.LANCZOS), (offset, offset))
+        return canvas
+
+    on_background(192, 0.92).save(REMOTE_ICON_DIR / "airon-192.png")
+    on_background(512, 0.92).save(REMOTE_ICON_DIR / "airon-512.png")
+    on_background(512, 0.66).save(REMOTE_ICON_DIR / "airon-maskable-512.png")
+    on_background(180, 0.86).convert("RGB").save(REMOTE_ICON_DIR / "apple-touch-icon.png")
 
 
 if __name__ == "__main__":

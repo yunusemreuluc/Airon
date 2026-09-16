@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from backend.core import commands
@@ -30,15 +30,22 @@ class TextCommand(BaseModel):
 
 
 @router.post("/text")
-async def send_text(command: TextCommand) -> dict:
+async def send_text(command: TextCommand, request: Request) -> dict:
     """Arayüzdeki yazı kutusundan gelen metin.
 
     ÖNEMLİ: Bu yol mikrofon olmadan da Aıron'la konuşmayı mümkün kılıyor —
     oturum `response_modalities=["AUDIO"]` olduğu için cevap SESLİ gelir.
+
+    Uzak mod (2026-09-15): metin telefondan geliyorsa cevap boş evde PC
+    hoparlöründen yüksek sesle ÇALMAMALI — uzak mod komuttan ÖNCE açılıyor.
+    PC'nin kendi penceresinden yazılıyorsa kullanıcı masada demektir, uzak mod
+    kapanıyor.
     """
     text = command.text.strip()
     if not text:
         return {"success": False, "message": "boş metin", "data": {}}
+    remote = bool(getattr(request.state, "remote", False))
+    commands.dispatch("remote_mode", {"value": remote, "quiet_if_unchanged": True})
     if not commands.dispatch("text", {"text": text}):
         return {"success": False, "message": "Sesli asistan çalışmıyor.", "data": {}}
     return {"success": True, "message": "gönderildi", "data": {}}

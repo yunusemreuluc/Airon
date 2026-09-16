@@ -2,9 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { LuCheck, LuMessageSquare, LuMic, LuMicOff, LuTrash2, LuX } from 'react-icons/lu';
+import {
+  LuCheck,
+  LuMessageSquare,
+  LuMic,
+  LuMicOff,
+  LuSmartphone,
+  LuTrash2,
+  LuX,
+} from 'react-icons/lu';
 import { useConversationStore } from '@/stores/conversationStore';
 import { resetSession, setMuted } from '@/services/voiceApi';
+import { setRemoteModeLocal } from '@/services/remoteApi';
 import { playSfx } from '@/services/sfxPlayer';
 import { GlassPanel } from './GlassPanel';
 import { VoicePanelContent } from './VoicePanelContent';
@@ -26,6 +35,7 @@ const CONFIRM_TIMEOUT_MS = 3200;
 export function AssistantDock() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const muted = useConversationStore((state) => state.muted);
+  const remote = useConversationStore((state) => state.remote);
   const lines = useConversationStore((state) => state.lines);
   const connected = useConversationStore((state) => state.connected);
   const clearLines = useConversationStore((state) => state.clear);
@@ -102,6 +112,22 @@ export function AssistantDock() {
 
       {/* Dock'un kendisi: her zaman görünen, sabit yükseklikte cam çubuk. */}
       <GlassPanel className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-2">
+        {/* Uzak mod (2026-09-15): telefondan yazılınca PC hoparlörü ve mikrofonu
+            kapanıyor. Eve dönen kullanıcı Aıron'un neden sustuğunu burada görmeli
+            — gizli bir durum "Aıron bozuldu" gibi okunurdu. Tek dokunuşla çıkış;
+            PC'den yazmak da uzak modu kendiliğinden kapatıyor. */}
+        {remote && (
+          <>
+            <DockButton
+              label="Uzak mod — PC sessiz. Kapat"
+              icon={LuSmartphone}
+              active
+              warning={false}
+              onClick={() => void setRemoteModeLocal(false)}
+            />
+            <span className="bg-border-subtle mx-0.5 h-5 w-px" />
+          </>
+        )}
         <DockButton
           label={muted ? 'Mikrofonu aç' : 'Mikrofonu kapat'}
           icon={muted ? LuMicOff : LuMic}

@@ -24,6 +24,7 @@ import base64
 import logging
 import threading
 import time
+from collections import deque
 from typing import Any, Callable
 
 from app_config import get_app_config_value
@@ -119,6 +120,11 @@ MIC_LEVEL_FPS = 12.0
 MAX_ARG_VALUE_CHARS = 48
 MAX_SUMMARIZED_ARGS = 3
 
+# Telefonun yeniden bağlanınca tamamladığı sohbet geçmişi (bkz.
+# backend/api/remote.py /history). Arayüzdeki MAX_LINES (200) kadar değil:
+# telefon yalnızca kaçırdığı son birkaç turu görmek istiyor.
+LOG_HISTORY_LINES = 80
+
 
 def _summarize_args(args: dict[str, Any] | None) -> str:
     """Araç argümanlarını Timeline'da tek satıra sığacak şekilde özetler."""
@@ -138,8 +144,24 @@ class WebUI:
 
     def __init__(self) -> None:
         # ── AironLive'ın okuduğu durum bayrakları ────────────────────────────
-        self.muted = False
+        # Kullanıcının kendi mikrofon tercihi. AironLive'ın okuduğu `muted` ise
+        # bir özellik: tercih VEYA uzak mod (bkz. `muted`).
+        self._user_muted = False
         self.paused = False
+        # Uzak mod (2026-09-15, telefon erişimi): kullanıcı evde değil. Hoparlör
+        # ve mikrofon birlikte kapanıyor — boş evde Aıron yüksek sesle cevap
+        # vermesin, ortam sesini de komut sanmasın. `speaker_muted`'ı
+        # AironLive._play_audio okuyor. Uzak moddan çıkınca mikrofon, uzak moda
+        # girmeden ÖNCEKİ hâline dönüyor (kullanıcı zaten kapatmışsa kapalı kalır).
+        self.remote_mode = False
+        self.speaker_muted = False
+        self._log_history: deque[dict[str, Any]] = deque(maxlen=LOG_HISTORY_LINES)
+        self._log_lock = threading.Lock()
+        # Telefondaki Aıron'un `query_desktop_airon` aracı (2026-09-15). Soru
+        # canlı oturuma normal bir metin gibi gidiyor; cevap ise "Aıron:" log
+        # satırı olarak dönüyor. Bekleyen varsa o satır ona teslim ediliyor.
+        self._answer_waiter: dict[str, Any] | None = None
+        self._answer_lock = threading.Lock()
 
         # ── AironLive'ın doldurduğu geri çağırma yuvaları ────────────────────
         # (AironLive.__init__ bunlara kendi metotlarını atıyor.)
@@ -169,6 +191,17 @@ class WebUI:
 
         self._register_commands()
 
+    @property
+    def muted(self) -> bool:
+        """Mikrofon fiilen kapalı mı — AironLive bunu okuyor.
+
+        Tercih ve uzak mod AYRI tutuluyor (Astra incelemesi, 2026-09-15): önceden
+        uzak mod girişte `muted`'ı ezip çıkışta eski değeri geri yazıyordu. Uzak
+        moddayken verilen susturma kararı çıkışta kayboluyor, uzak moddayken
+        mikrofonu açmak ise sonraki telefon mesajında kapanmıyordu.
+        """
+        return self._user_muted or self.remote_mode
+
     def bind_assistant(self, assistant: Any) -> None:
         self._assistant = assistant
         self._emit_status()
@@ -192,6 +225,8 @@ class WebUI:
         commands.register("pause", self._handle_pause)
         commands.register("reset", self._handle_reset)
         commands.register("voice", self._handle_voice)
+        commands.register("remote_mode", self._handle_remote_mode)
+        commands.register("ask", self._handle_ask)
         # Vision paneli (2026-07-30). `on_webcam_toggle` yuvası 2026-07-29'dan
         # beri vardı ve AironLive onu dolduruyordu, ama komut olarak HİÇ
         # kaydedilmemişti — yani kamerayı yalnızca Aıron kendi aracıyla
@@ -203,6 +238,9 @@ class WebUI:
         # Otomasyon paneli (2026-07-30) — aktif izlemelerin tek kaynağı
         # AironLive'ın belleği; API onu buradan okuyor.
         commands.register_provider("automation", self._automation_snapshot)
+        commands.register_provider("log_history", self._log_history_snapshot)
+        commands.register_provider("assistant_status", self._status_snapshot)
+        commands.register("ask_cancel", lambda _payload: self.cancel_ask())
 
     def _handle_text(self, payload: dict) -> None:
         text = str(payload.get("text", "")).strip()
@@ -215,9 +253,73 @@ class WebUI:
         threading.Thread(target=self.on_text_command, args=(text,), daemon=True).start()
 
     def _handle_mute(self, payload: dict) -> None:
-        self.muted = bool(payload.get("value", False))
-        self.write_log("SYS: Mikrofon kapatıldı." if self.muted else "SYS: Mikrofon açık.")
+        self._user_muted = bool(payload.get("value", False))
+        if not self._user_muted and self.remote_mode:
+            # Uzak modda mikrofon fiilen kapalı; PC'den "aç" diyen biri masada
+            # demektir — sessizce hiçbir şey olmaması yerine uzak moddan çık.
+            self._set_remote_mode(False)
+            return
+        self.write_log("SYS: Mikrofon kapatıldı." if self._user_muted else "SYS: Mikrofon açık.")
         self._emit_status()
+
+    def _handle_remote_mode(self, payload: dict) -> None:
+        """Uzak modu aç/kapat.
+
+        `quiet_if_unchanged`: voice.py her metin komutunda isteğin nereden
+        geldiğine göre bu komutu gönderiyor — durum zaten doğruysa sohbete her
+        seferinde "uzak mod açık" satırı düşmesin.
+        """
+        enabled = bool(payload.get("value", False))
+        if enabled == self.remote_mode:
+            if not payload.get("quiet_if_unchanged"):
+                self._emit_status()
+            return
+
+        self._set_remote_mode(enabled)
+
+    def _set_remote_mode(self, enabled: bool) -> None:
+        self.remote_mode = enabled
+        self.speaker_muted = enabled
+        if enabled:
+            self.write_log("SYS: Uzak mod açık — PC hoparlörü ve mikrofonu kapalı, cevaplar yazılı.")
+        else:
+            self.write_log(
+                "SYS: Uzak mod kapandı — PC hoparlörü açık"
+                + (", mikrofon senin tercihinle kapalı." if self._user_muted else ".")
+            )
+        self._emit_status()
+
+    def _handle_ask(self, payload: dict) -> None:
+        """Soruyu gönderir ve SONRAKİ Aıron cevabını `on_answer`'a teslim eder.
+
+        Tek bekleyen: backend/api/remote.py soruları kilitle sıraya koyuyor.
+        Aynı anda iki soru olsaydı hangi cevabın hangisine ait olduğu log
+        satırından anlaşılamazdı.
+        """
+        text = str(payload.get("text", "")).strip()
+        on_answer = payload.get("on_answer")
+        if not text or not callable(on_answer) or not self.on_text_command:
+            return
+        if self.paused:
+            on_answer("Aıron PC'de duraklatılmış, soruyu işleyemiyor.", False)
+            return
+        if not self.remote_mode:
+            self._set_remote_mode(True)
+        # Bekleyen, kendi sorusunun "Siz:" satırı log'a düşene kadar SİLAHSIZ.
+        # Astra incelemesi (2026-09-15): önceki sürüm kayıt anından sonraki İLK
+        # "Aıron:" satırını alıyordu — zaman aşımına uğramış önceki sorunun geç
+        # cevabı ya da bir proaktif bekçi mesajı yanlış soruya teslim ediliyordu.
+        with self._answer_lock:
+            self._answer_waiter = {"text": text, "armed": False, "callback": on_answer}
+        threading.Thread(target=self.on_text_command, args=(text,), daemon=True).start()
+
+    def cancel_ask(self) -> None:
+        with self._answer_lock:
+            self._answer_waiter = None
+
+    def _log_history_snapshot(self) -> list[dict[str, Any]]:
+        with self._log_lock:
+            return list(self._log_history)
 
     def _handle_pause(self, payload: dict) -> None:
         self.paused = bool(payload.get("value", False))
@@ -282,11 +384,16 @@ class WebUI:
             return {"watches": [], "briefing": None}
         return snapshot()
 
+    def _status_snapshot(self) -> dict[str, Any]:
+        return {
+            "muted": self.muted,
+            "paused": self.paused,
+            "ready": self.is_ready(),
+            "remote": self.remote_mode,
+        }
+
     def _emit_status(self) -> None:
-        self._emit(
-            "assistant_status",
-            {"muted": self.muted, "paused": self.paused, "ready": self.is_ready()},
-        )
+        self._emit("assistant_status", self._status_snapshot())
 
     # ── AironUI yüzeyi — AironLive'ın çağırdıkları ──────────────────────────
     def set_state(self, state: str) -> None:
@@ -316,7 +423,41 @@ class WebUI:
         satır düşünmeyi, "ERR:" hata durumunu tetikler. Bu sözleşme eski Tkinter
         arayüzünden devralındı — `AironLive` log satırlarını hâlâ bu öneklerle
         yazıyor, o yüzden ayrıştırma burada yaşıyor (bkz. conversationStore.ts)."""
-        self._emit("log", {"text": text, "at": time.time()})
+        entry = {"text": text, "at": time.time()}
+        # Geçmişe yayından ÖNCE yazılıyor: telefon /history'yi tam yayın anında
+        # sorarsa satır ya geçmişte ya canlı akışta olsun, ikisinde birden
+        # yoksa kaybolmasın (telefon ikisini `at`+metin ile birleştiriyor).
+        with self._log_lock:
+            self._log_history.append(entry)
+        self._emit("log", entry)
+
+        self._deliver_answer(text)
+
+    def _deliver_answer(self, text: str) -> None:
+        """Bekleyen `/ask` sorusu varsa cevabını teslim eder.
+
+        Sıra: önce sorunun kendi "Siz: <soru>" satırı görülmeli (silahlanma),
+        ANCAK ondan sonraki ilk "Aıron:" satırı cevap sayılır. ERR satırları
+        bekleyeni çözmüyor: bir aracın hatası turun sonu değil, model yine konuşuyor.
+        Kalan sınır: silahlanmayla cevap arasına bir proaktif bekçi mesajı
+        girerse o teslim edilir — bekçiler uzak modda seyrek, bilinçli kabul.
+        """
+        callback = None
+        answer = ""
+        with self._answer_lock:
+            waiter = self._answer_waiter
+            if waiter is None:
+                return
+            head, _, body = text.partition(":")
+            head = head.strip().lower()
+            if head in ("siz", "you") and body.strip() == waiter["text"]:
+                waiter["armed"] = True
+            elif waiter["armed"] and head in ("aıron", "airon"):
+                self._answer_waiter = None
+                callback = waiter["callback"]
+                answer = body.strip()
+        if callback is not None:
+            callback(answer, True)
 
         lowered = text.lower()
         if lowered.startswith("siz:") or lowered.startswith("you:"):

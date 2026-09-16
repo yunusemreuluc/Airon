@@ -292,6 +292,96 @@ body {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   TELEFON — app/m (uzaktan erişim, 2026-09-15)
+
+   Masaüstünün 3D sahnesi telefonda yok: WebGL + bloom pili bitirir, mobil veride
+   Three.js paketi de ağır. Çekirdeğin YERİNE saf CSS bir hologram duruyor
+   (components/remote/RemoteCore.tsx) — aynı palet, aynı "asla durağan değil"
+   kuralı, GPU'da yalnızca transform/opacity.
+   ══════════════════════════════════════════════════════════════════════════ */
+.remote-root {
+  /* iOS'ta adres çubuğu açılıp kapanırken yükseklik zıplamasın. */
+  height: 100dvh;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+.remote-safe-top {
+  padding-top: max(14px, env(safe-area-inset-top));
+}
+
+.remote-safe-bottom {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.remote-scroll {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.remote-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes remote-breathe {
+  0%,
+  100% {
+    transform: scale(0.94);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes remote-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes remote-spin-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes remote-halo {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.08);
+  }
+}
+
+/* Aracın çalıştığını gösteren çipte soldan sağa geçen ışık. */
+@keyframes remote-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(220%);
+  }
+}
+
+@keyframes remote-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
 /* ── Erişilebilirlik ──
    CLAUDE.md § PERFORMANCE + . 3D sahne kendi reduced-motion kontrolünü
    yapıyor (usePrefersReducedMotion); burada tüm CSS/DOM geçişleri kısılıyor. */

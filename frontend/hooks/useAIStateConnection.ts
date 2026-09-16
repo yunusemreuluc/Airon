@@ -12,8 +12,10 @@ import {
   type TextLine,
 } from '@/stores/visionStore';
 import { playSfx } from '@/services/sfxPlayer';
+import { websocketUrl } from '@/services/apiClient';
 
-const WS_URL = 'ws://localhost:8000/ws';
+/** Uzak modda PC hoparlörü susuyor — arayüzün ses efektleri de susmalı. */
+const sfxAllowed = () => !useConversationStore.getState().remote;
 const RECONNECT_DELAY_MS = 3000;
 
 // Bu küme core/web_ui.py STATE_MAP'in değerleriyle AYNI olmak zorunda: burada
@@ -115,7 +117,7 @@ export function useAIStateConnection() {
 
     const connect = () => {
       if (cancelled) return;
-      socket = new WebSocket(WS_URL);
+      socket = new WebSocket(websocketUrl());
 
       socket.onopen = () => {
         stopDemo();
@@ -141,19 +143,20 @@ export function useAIStateConnection() {
               if (typeof data.text === 'string') {
                 useConversationStore.getState().appendLog(data.text, data.at);
                 // Tkinter sürümündeki davranış: hata satırı gelince hata sesi.
-                if (data.text.toLowerCase().startsWith('err:')) playSfx('error');
+                if (data.text.toLowerCase().startsWith('err:') && sfxAllowed()) playSfx('error');
               }
               break;
             case 'sfx':
               // Araç başarıyla bittiğinde AironLive'ın çaldırdığı ses
               // (bkz. core/web_ui.py play_success_sfx).
-              if (data.name === 'success') playSfx('success');
+              if (data.name === 'success' && sfxAllowed()) playSfx('success');
               break;
             case 'assistant_status':
               useConversationStore.getState().setStatus({
                 muted: data.muted,
                 paused: data.paused,
                 ready: data.ready,
+                remote: data.remote,
               });
               break;
             // ── Görü (2026-07-30) ──

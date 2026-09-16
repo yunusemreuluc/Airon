@@ -10,6 +10,7 @@ Fark yalnızca kabuk: adres çubuğu, sekme, tarayıcı çerçevesi yok.
 
 MİMARİ — tek Python süreci, iki katman:
     [WebView2 penceresi]  ──HTTP/WS──>  [FastAPI (127.0.0.1:8000, arka plan thread)]
+    [Telefon · Tailscale] ──HTTPS──> tailscale serve ──> 127.0.0.1:8001 (aynı sunucu)
                                               ├── / .......... frontend/out (statik arayüz)
                                               ├── /api/* ..... REST
                                               └── /ws ........ canlı durum akışı
@@ -63,6 +64,10 @@ if sys.stdout is None or sys.stderr is None:
 HOST = "127.0.0.1"
 PORT = 8000
 URL = f"http://{HOST}:{PORT}/"
+# Telefon erişimi (2026-09-15). Aynı uvicorn sunucusu bu portu da dinliyor;
+# `tailscale serve` buraya yönlendiriliyor. İsteğin uzak olduğu proxy
+# başlıklarından değil bu porttan anlaşılıyor — bkz. backend/core/remote_auth.py.
+REMOTE_PORT = 8001
 FRONTEND_EXPORT_DIR = BASE_DIR / "frontend" / "out"
 
 # İkonlar (bkz. make_icon.py — prosedürel üretim, boyut başına ayrı çizim).
@@ -349,6 +354,15 @@ def _port_is_open(host: str, port: int, timeout: float = 0.4) -> bool:
         return sock.connect_ex((host, port)) == 0
 
 
+def _bind_socket(host: str, port: int) -> socket.socket:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # SO_REUSEADDR BİLEREK YOK: Windows'ta başka bir sürecin dinlediği portu
+    # sessizce paylaşmaya izin veriyor — yanlış backend'e bağlanmak demek.
+    sock.bind((host, port))
+    sock.set_inheritable(True)
+    return sock
+
+
 def _start_backend() -> "threading.Thread | None":
     """Backend'i arka plan thread'inde başlatır.
 
@@ -364,9 +378,21 @@ def _start_backend() -> "threading.Thread | None":
 
     from backend.main import app
 
-    config = uvicorn.Config(app, host=HOST, port=PORT, log_level="warning")
+    # İki soket, TEK sunucu: iki ayrı uvicorn sunucusu iki ayrı asyncio döngüsü
+    # demek, oysa WebSocket yayını (backend/websocket/manager.py) tek döngüye
+    # bağlı — ikinci döngüdeki bağlantılara yayın yapılamazdı.
+    sockets = [_bind_socket(HOST, PORT)]
+    try:
+        sockets.append(_bind_socket(HOST, REMOTE_PORT))
+    except OSError as exc:
+        # Telefon erişimi olmasın diye uygulamanın hiç açılmaması kabul edilemez.
+        print(f"[Aıron] Uzak erişim portu {REMOTE_PORT} açılamadı ({exc}) — telefon erişimi kapalı.")
+
+    config = uvicorn.Config(app, log_level="warning")
     server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, name="airon-backend", daemon=True)
+    thread = threading.Thread(
+        target=server.run, kwargs={"sockets": sockets}, name="airon-backend", daemon=True
+    )
     thread.start()
     return thread
 

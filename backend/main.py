@@ -19,8 +19,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.api import automation, macro, memory, settings, system, vision, voice
+from backend.api import automation, macro, memory, remote, settings, system, vision, voice
 from backend.core.config import CORS_ORIGINS
+from backend.core.remote_auth import RemoteAccessMiddleware
 from backend.websocket.manager import manager
 from backend.websocket.router import router as websocket_router
 
@@ -54,8 +55,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Uzaktan erişim kapısı (2026-09-15) — EN DIŞTA olmalı: CORS dahil hiçbir katman
+# kimliği doğrulanmamış uzak bir isteği görmesin. Starlette'te son eklenen ara
+# katman en dışta çalışır. Bkz. backend/core/remote_auth.py.
+app.add_middleware(RemoteAccessMiddleware)
 
-for router_module in (voice, system, settings, vision, memory, automation, macro):
+for router_module in (voice, system, settings, vision, memory, automation, macro, remote):
     app.include_router(router_module.router)
 
 app.include_router(websocket_router)

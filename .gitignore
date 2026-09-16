@@ -38,3 +38,6 @@ weights/
 # Çalışma zamanı log dosyası
 logs/*.log
 config/window_state.json
+
+# İstek listesi çalışma durumu (işlenmiş istek kimlikleri)
+config/feature_requests_state.json

@@ -11,8 +11,13 @@ import type { NextConfig } from 'next';
 // route handler veya middleware kullanmıyor.
 //
 // `npm run dev` bundan etkilenmez — geliştirme akışı aynı.
+//
+// `trailingSlash` (2026-09-15, telefon arayüzü): ikinci sayfa `/m` eklendi.
+// Onsuz export `out/m.html` üretiyor ve FastAPI'nin StaticFiles'ı `/m/`'i
+// `m/index.html` olarak arıyor — bulamayıp 404 dönüyor. Bununla `out/m/index.html`.
 const nextConfig: NextConfig = {
   output: 'export',
+  trailingSlash: true,
 };
 
 export default nextConfig;

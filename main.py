@@ -16,7 +16,6 @@ import datetime
 import logging
 import math
 import threading
-import os
 import time
 import re
 from collections import deque
@@ -735,20 +734,6 @@ class AironLive:
             self._loop
         )
 
-    async def _interrupt_audio(self):
-        try:
-            if self.audio_in_queue:
-                while not self.audio_in_queue.empty():
-                    try:
-                        self.audio_in_queue.get_nowait()
-                    except Exception:
-                        break
-            if self.session:
-                await self.session.send_realtime_input(audio_stream_end=True)
-            self.set_speaking(False)
-        except Exception:
-            pass
-
     def _stop_music(self):
         proc = self._music_proc
         if proc and proc.poll() is None:
@@ -942,7 +927,10 @@ class AironLive:
         """Tüm proaktif bekçilerin (ekran, sistem sağlığı, özel izleme) ortak ön
         koşulu — duraklatılmışken, susturulmuşken, Aıron zaten konuşurken veya
         oturum hazır değilken hiçbiri çalışmamalı."""
-        if self._paused or self.ui.muted:
+        # Uzak modda mikrofon teknik olarak kapalı ama kullanıcı "beni rahat
+        # bırak" demedi — tam tersine telefondan "bitince haber ver" diyebilmeli.
+        # Bekçi mesajları o modda telefona yazı olarak düşüyor.
+        if self._paused or (self.ui.muted and not getattr(self.ui, "remote_mode", False)):
             return False
         if block_on_webcam and self._webcam_streamer.is_active:
             return False
@@ -1557,6 +1545,12 @@ class AironLive:
                     # turn_complete sentinel — tum ses calindi, dinlemeye gec
                     self.set_speaking(False)
                     speaking_overlay.set_speaking(False)
+                    continue
+                # Uzak mod (bkz. core/web_ui.py): kullanıcı evde değil, cevap
+                # telefona YAZI olarak gidiyor (output_transcription → log).
+                # Ses parçası çalınmadan düşürülüyor; transkript bundan
+                # etkilenmiyor, çünkü modelin çıktısından geliyor, hoparlörden değil.
+                if getattr(self.ui, "speaker_muted", False):
                     continue
                 self.set_speaking(True)
                 # Tepsi göstergesi GERÇEK sesten besleniyor (bkz.
